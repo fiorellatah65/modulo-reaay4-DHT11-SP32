@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Dashboard Pro</title>
+    <title>ESP32 Control Automático</title>
     <style>
         :root {
             --primary: #667eea;
@@ -11,20 +11,17 @@
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
+            --info: #06b6d4;
             --bg: #0f172a;
             --card: #1e293b;
             --text: #f1f5f9;
             --border: #334155;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -61,7 +58,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            animation: slideIn 0.5s;
         }
 
         .status-badge.online {
@@ -105,12 +101,6 @@
             padding: 25px;
             border: 1px solid var(--border);
             animation: fadeInUp 0.5s;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
         }
 
         .card-header {
@@ -127,126 +117,60 @@
             flex: 1;
         }
 
-        .icon {
-            font-size: 1.8em;
-        }
-
-        .sensor-grid {
-            display: grid;
-            gap: 15px;
-        }
-
-        .sensor-item {
+        .temp-control {
             background: rgba(102, 126, 234, 0.1);
             border: 2px solid var(--primary);
             border-radius: 15px;
-            padding: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .temp-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .temp-current {
             text-align: center;
-            transition: all 0.3s;
         }
 
-        .sensor-item:hover {
-            background: rgba(102, 126, 234, 0.2);
-            transform: scale(1.05);
-        }
-
-        .sensor-label {
-            font-size: 0.9em;
-            opacity: 0.8;
-            margin-bottom: 8px;
-        }
-
-        .sensor-value {
-            font-size: 2.5em;
+        .temp-value {
+            font-size: 3em;
             font-weight: bold;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .sensor-range {
-            font-size: 0.85em;
-            opacity: 0.6;
+        .temp-label {
+            font-size: 0.9em;
+            opacity: 0.7;
             margin-top: 5px;
         }
 
-        .relay-item {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 20px;
+        .temp-setpoint {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            transition: all 0.3s;
+            gap: 15px;
+            margin-top: 20px;
         }
 
-        .relay-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .relay-item.active {
-            background: rgba(16, 185, 129, 0.2);
-            border: 2px solid var(--success);
-        }
-
-        .relay-info {
+        .temp-input {
             flex: 1;
-        }
-
-        .relay-name {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            color: var(--text);
             font-size: 1.1em;
-            font-weight: 600;
-            margin-bottom: 5px;
+            text-align: center;
         }
 
-        .relay-time {
-            font-size: 0.85em;
-            opacity: 0.7;
-        }
-
-        .switch {
-            position: relative;
-            width: 60px;
-            height: 30px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #475569;
-            transition: .4s;
-            border-radius: 30px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background: linear-gradient(135deg, var(--success), #059669);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(30px);
+        .temp-input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         .btn {
@@ -259,8 +183,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            width: 100%;
-            margin-top: 10px;
         }
 
         .btn:hover {
@@ -268,12 +190,69 @@
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
         }
 
-        .btn:active {
-            transform: translateY(0);
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9em;
         }
 
-        .btn-danger {
-            background: linear-gradient(135deg, var(--danger), #dc2626);
+        .relay-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .relay-item.active {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+        }
+
+        .relay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .relay-name {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .relay-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .relay-info {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
         }
 
         .chart-container {
@@ -281,30 +260,62 @@
             margin-top: 15px;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .stat-box {
-            background: rgba(255, 255, 255, 0.05);
+        .alert-box {
             padding: 15px;
             border-radius: 10px;
-            text-align: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .stat-value {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: var(--primary);
+        .alert-box.warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 2px solid var(--warning);
+            color: var(--warning);
         }
 
-        .stat-label {
-            font-size: 0.85em;
-            opacity: 0.7;
-            margin-top: 5px;
+        .alert-box.danger {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .alert-box.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
         }
 
         @keyframes fadeIn {
@@ -323,31 +334,16 @@
             }
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
         @media (max-width: 768px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-            .header h1 {
-                font-size: 1.8em;
-            }
+            .dashboard { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8em; }
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🎛️ ESP32 Dashboard Pro</h1>
-        <p style="opacity: 0.7;">Control de Relays & Monitoreo de Sensores</p>
+        <h1>🤖 ESP32 Control Automático Inteligente</h1>
+        <p style="opacity: 0.7;">Sistema de Control por Temperatura con Histéresis</p>
     </div>
 
     <div class="status-bar">
@@ -359,125 +355,184 @@
             <span class="pulse red"></span>
             <span>ESP32: Offline</span>
         </div>
-        <div class="status-badge" style="background: rgba(102, 126, 234, 0.2); border: 2px solid var(--primary); color: var(--primary);">
-            <span>⏱️</span>
-            <span id="uptime">--</span>
-        </div>
     </div>
 
+    <div id="alertBox" style="max-width: 1600px; margin: 0 auto 20px;"></div>
+
     <div class="dashboard">
+        <!-- Control de Temperatura -->
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.8em;">🎯</span>
+                <h2>Control de Temperatura</h2>
+            </div>
+            
+            <div class="temp-control">
+                <div class="temp-display">
+                    <div class="temp-current">
+                        <div class="temp-value" id="currentTemp">--°C</div>
+                        <div class="temp-label">Temperatura Actual</div>
+                    </div>
+                    <div class="temp-current">
+                        <div class="temp-value" style="background: linear-gradient(135deg, #f59e0b, #ef4444);" id="setpointTemp">24°C</div>
+                        <div class="temp-label">Objetivo (Setpoint)</div>
+                    </div>
+                </div>
+
+                <div class="temp-setpoint">
+                    <input type="number" id="setpointInput" class="temp-input" value="24" step="0.5" min="15" max="35">
+                    <button class="btn btn-sm" onclick="updateSetpoint()">✓ Aplicar</button>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Histéresis (±)</span>
+                        <span id="hystValue">2.0°C</span>
+                    </div>
+                    <input type="range" class="slider" id="hystSlider" min="0.5" max="5" step="0.5" value="2" oninput="updateHysteresis(this.value)">
+                </div>
+
+                <div style="margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                    <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 10px;">Rangos de activación:</div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85em;">
+                        <span>🔥 Encender: <strong id="tempHigh">26.0°C</strong></span>
+                        <span>❄️ Apagar: <strong id="tempLow">22.0°C</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Sensores -->
         <div class="card">
             <div class="card-header">
-                <span class="icon">🌡️</span>
+                <span style="font-size: 1.8em;">🌡️</span>
                 <h2>Sensores DHT11</h2>
             </div>
-            <div class="sensor-grid">
-                <div class="sensor-item">
-                    <div class="sensor-label">Temperatura</div>
-                    <div class="sensor-value" id="temp">--°C</div>
-                    <div class="sensor-range" id="tempRange">Min: -- | Max: --</div>
-                </div>
-                <div class="sensor-item">
-                    <div class="sensor-label">Humedad</div>
-                    <div class="sensor-value" id="hum">--%</div>
-                    <div class="sensor-range" id="humRange">Min: -- | Max: --</div>
-                </div>
+            
+            <div style="background: rgba(102, 126, 234, 0.1); border: 2px solid var(--primary); border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 8px;">Temperatura</div>
+                <div style="font-size: 2.5em; font-weight: bold; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;" id="temp">--°C</div>
+                <div style="font-size: 0.85em; opacity: 0.6; margin-top: 5px;" id="tempRange">Min: -- | Max: --</div>
             </div>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value" id="wifiSignal">--</div>
-                    <div class="stat-label">📶 WiFi (dBm)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="readings">0</div>
-                    <div class="stat-label">📊 Lecturas</div>
-                </div>
+
+            <div style="background: rgba(6, 182, 212, 0.1); border: 2px solid var(--info); border-radius: 15px; padding: 20px; text-align: center;">
+                <div style="font-size: 0.9em; opacity: 0.8; margin-bottom: 8px;">Humedad</div>
+                <div style="font-size: 2.5em; font-weight: bold; color: var(--info);" id="hum">--%</div>
+                <div style="font-size: 0.85em; opacity: 0.6; margin-top: 5px;" id="humRange">Min: -- | Max: --</div>
             </div>
         </div>
 
         <!-- Gráfico Temperatura -->
         <div class="card">
             <div class="card-header">
-                <span class="icon">📈</span>
-                <h2>Temperatura (Tiempo Real)</h2>
+                <span style="font-size: 1.8em;">📈</span>
+                <h2>Temperatura vs Setpoint</h2>
             </div>
             <div class="chart-container">
                 <canvas id="tempChart"></canvas>
             </div>
         </div>
 
-        <!-- Gráfico Humedad -->
+        <!-- Control Relay 1 -->
         <div class="card">
             <div class="card-header">
-                <span class="icon">💧</span>
-                <h2>Humedad (Tiempo Real)</h2>
+                <span style="font-size: 1.8em;">💨</span>
+                <h2>Relay 1 - Ventilador</h2>
             </div>
-            <div class="chart-container">
-                <canvas id="humChart"></canvas>
+            <div id="relay1" class="relay-item">
+                <div class="relay-header">
+                    <div class="relay-name">💨 Ventilador (Cooling)</div>
+                </div>
+                <div class="relay-controls">
+                    <button class="mode-btn" onclick="setMode(0, 0)">⭕ OFF</button>
+                    <button class="mode-btn" onclick="setMode(0, 1)">🟢 ON</button>
+                    <button class="mode-btn active" onclick="setMode(0, 2)">🤖 AUTO</button>
+                    <button class="mode-btn" onclick="setMode(0, 3)">🎮 MANUAL</button>
+                </div>
+                <div class="relay-info">
+                    <span>Estado: <strong class="state">OFF</strong></span>
+                    <span>Modo: <strong class="mode">MANUAL</strong></span>
+                    <span>Tiempo: <strong class="time">0s</strong></span>
+                </div>
             </div>
         </div>
 
-        <!-- Control de Relays -->
+        <!-- Control Relay 2 -->
         <div class="card">
             <div class="card-header">
-                <span class="icon">⚡</span>
-                <h2>Control de Relays</h2>
+                <span style="font-size: 1.8em;">🔥</span>
+                <h2>Relay 2 - Calefactor</h2>
             </div>
-            
-            <div id="relay1" class="relay-item">
-                <div class="relay-info">
-                    <div class="relay-name">💡 Relay 1</div>
-                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" onchange="toggleRelay(1, this.checked)">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
             <div id="relay2" class="relay-item">
-                <div class="relay-info">
-                    <div class="relay-name">🔌 Relay 2</div>
-                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                <div class="relay-header">
+                    <div class="relay-name">🔥 Calefactor (Heating)</div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" onchange="toggleRelay(2, this.checked)">
-                    <span class="slider"></span>
-                </label>
+                <div class="relay-controls">
+                    <button class="mode-btn" onclick="setMode(1, 0)">⭕ OFF</button>
+                    <button class="mode-btn" onclick="setMode(1, 1)">🟢 ON</button>
+                    <button class="mode-btn" onclick="setMode(1, 2)">🤖 AUTO</button>
+                    <button class="mode-btn active" onclick="setMode(1, 3)">🎮 MANUAL</button>
+                </div>
+                <div class="relay-info">
+                    <span>Estado: <strong class="state">OFF</strong></span>
+                    <span>Modo: <strong class="mode">MANUAL</strong></span>
+                    <span>Tiempo: <strong class="time">0s</strong></span>
+                </div>
             </div>
+        </div>
 
+        <!-- Control Relay 3 -->
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.8em;">💧</span>
+                <h2>Relay 3 - Humidificador</h2>
+            </div>
             <div id="relay3" class="relay-item">
-                <div class="relay-info">
-                    <div class="relay-name">🌟 Relay 3</div>
-                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                <div class="relay-header">
+                    <div class="relay-name">💧 Humidificador</div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" onchange="toggleRelay(3, this.checked)">
-                    <span class="slider"></span>
-                </label>
+                <div class="relay-controls">
+                    <button class="mode-btn" onclick="setMode(2, 0)">⭕ OFF</button>
+                    <button class="mode-btn" onclick="setMode(2, 1)">🟢 ON</button>
+                    <button class="mode-btn" onclick="setMode(2, 2)">🤖 AUTO</button>
+                    <button class="mode-btn active" onclick="setMode(2, 3)">🎮 MANUAL</button>
+                </div>
+                <div class="relay-info">
+                    <span>Estado: <strong class="state">OFF</strong></span>
+                    <span>Modo: <strong class="mode">MANUAL</strong></span>
+                    <span>Tiempo: <strong class="time">0s</strong></span>
+                </div>
             </div>
+        </div>
 
+        <!-- Control Relay 4 -->
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.8em;">💡</span>
+                <h2>Relay 4 - Luz</h2>
+            </div>
             <div id="relay4" class="relay-item">
-                <div class="relay-info">
-                    <div class="relay-name">⭐ Relay 4</div>
-                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                <div class="relay-header">
+                    <div class="relay-name">💡 Luz</div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" onchange="toggleRelay(4, this.checked)">
-                    <span class="slider"></span>
-                </label>
+                <div class="relay-controls">
+                    <button class="mode-btn" onclick="setMode(3, 0)">⭕ OFF</button>
+                    <button class="mode-btn" onclick="setMode(3, 1)">🟢 ON</button>
+                    <button class="mode-btn" onclick="setMode(3, 2)">🤖 AUTO</button>
+                    <button class="mode-btn active" onclick="setMode(3, 3)">🎮 MANUAL</button>
+                </div>
+                <div class="relay-info">
+                    <span>Estado: <strong class="state">OFF</strong></span>
+                    <span>Modo: <strong class="mode">MANUAL</strong></span>
+                    <span>Tiempo: <strong class="time">0s</strong></span>
+                </div>
             </div>
-
-            <button class="btn" onclick="toggleAllRelays(true)">🔆 Encender Todos</button>
-            <button class="btn btn-danger" onclick="toggleAllRelays(false)">🔻 Apagar Todos</button>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
-        // ===== CONFIGURACIÓN AUTOMÁTICA =====
         const MQTT_CONFIG = {
             host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
             port: 8884,
@@ -486,35 +541,40 @@
         };
 
         let client = null;
-        let tempChart, humChart;
-        let tempData = [], humData = [], labels = [];
+        let tempChart;
+        let tempData = [], setpointData = [], labels = [];
         let maxDataPoints = 20;
-        let readingCount = 0;
+        let currentSetpoint = 24;
+        let currentHyst = 2;
 
-        // ===== GRÁFICOS =====
-        function initCharts() {
-            const chartConfig = (label, color) => ({
+        const modeNames = ['OFF', 'ON', 'AUTO', 'MANUAL'];
+
+        function initChart() {
+            tempChart = new Chart(document.getElementById('tempChart'), {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: label,
-                        data: label === 'Temperatura (°C)' ? tempData : humData,
-                        borderColor: color,
-                        backgroundColor: color + '33',
+                        label: 'Temperatura',
+                        data: tempData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: '#f59e0b33',
                         borderWidth: 3,
                         tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
+                        fill: true
+                    }, {
+                        label: 'Setpoint',
+                        data: setpointData,
+                        borderColor: '#ef4444',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0,
+                        fill: false
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
                     scales: {
                         y: {
                             beginAtZero: false,
@@ -528,42 +588,35 @@
                     }
                 }
             });
-
-            tempChart = new Chart(document.getElementById('tempChart'), chartConfig('Temperatura (°C)', '#f59e0b'));
-            humChart = new Chart(document.getElementById('humChart'), chartConfig('Humedad (%)', '#06b6d4'));
         }
 
-        function updateCharts(temp, hum) {
+        function updateChart(temp) {
             const now = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
             if (tempData.length >= maxDataPoints) {
                 tempData.shift();
-                humData.shift();
+                setpointData.shift();
                 labels.shift();
             }
             
             tempData.push(temp);
-            humData.push(hum);
+            setpointData.push(currentSetpoint);
             labels.push(now);
             
             tempChart.update('none');
-            humChart.update('none');
         }
 
-        // ===== MQTT =====
         function connectMQTT() {
             const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
             
-            const options = {
+            client = mqtt.connect(url, {
                 username: MQTT_CONFIG.user,
                 password: MQTT_CONFIG.pass,
                 clientId: 'WebDash_' + Math.random().toString(16).substr(2, 8),
                 clean: true,
                 reconnectPeriod: 5000,
                 keepalive: 60
-            };
-
-            client = mqtt.connect(url, options);
+            });
 
             client.on('connect', () => {
                 console.log('✅ Conectado a MQTT');
@@ -572,6 +625,7 @@
                 client.subscribe('esp32/sensores');
                 client.subscribe('esp32/status');
                 client.subscribe('esp32/relay/status');
+                client.subscribe('esp32/config');
             });
 
             client.on('message', (topic, message) => {
@@ -585,15 +639,14 @@
                 } else if (topic === 'esp32/relay/status') {
                     const data = JSON.parse(msg);
                     updateRelayStatus(data);
+                } else if (topic === 'esp32/config') {
+                    const data = JSON.parse(msg);
+                    updateConfig(data);
                 }
             });
 
             client.on('error', (err) => {
                 console.error('❌ Error MQTT:', err);
-                updateStatus('mqttStatus', false);
-            });
-
-            client.on('close', () => {
                 updateStatus('mqttStatus', false);
             });
         }
@@ -616,68 +669,117 @@
 
         function updateSensorData(data) {
             document.getElementById('temp').textContent = data.temp.toFixed(1) + '°C';
+            document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
             document.getElementById('hum').textContent = data.hum.toFixed(0) + '%';
             document.getElementById('tempRange').textContent = `Min: ${data.tempMin.toFixed(1)} | Max: ${data.tempMax.toFixed(1)}`;
             document.getElementById('humRange').textContent = `Min: ${data.humMin.toFixed(0)} | Max: ${data.humMax.toFixed(0)}`;
-            document.getElementById('wifiSignal').textContent = data.wifi;
-            document.getElementById('uptime').textContent = formatUptime(data.uptime);
             
-            readingCount++;
-            document.getElementById('readings').textContent = readingCount;
+            if (data.setpoint) {
+                currentSetpoint = data.setpoint;
+                document.getElementById('setpointTemp').textContent = data.setpoint.toFixed(1) + '°C';
+            }
             
-            updateCharts(data.temp, data.hum);
+            updateChart(data.temp);
+            updateAlert(data.alert);
+        }
+
+        function updateAlert(alert) {
+            const box = document.getElementById('alertBox');
+            if (alert === 'OK') {
+                box.innerHTML = '<div class="alert-box success">✅ Temperatura en rango óptimo</div>';
+            } else if (alert === 'TEMP_HIGH') {
+                box.innerHTML = '<div class="alert-box danger">🔥 ¡ALERTA! Temperatura muy alta</div>';
+            } else if (alert === 'TEMP_LOW') {
+                box.innerHTML = '<div class="alert-box warning">❄️ ALERTA: Temperatura muy baja</div>';
+            } else if (alert === 'HUM_HIGH') {
+                box.innerHTML = '<div class="alert-box warning">💧 ALERTA: Humedad muy alta</div>';
+            } else if (alert === 'HUM_LOW') {
+                box.innerHTML = '<div class="alert-box warning">🏜️ ALERTA: Humedad muy baja</div>';
+            }
         }
 
         function updateRelayStatus(data) {
             for (let i = 1; i <= 4; i++) {
                 const relay = document.getElementById(`relay${i}`);
-                const checkbox = relay.querySelector('input');
-                const timeSpan = relay.querySelector('.time');
-                const state = data[`r${i}`];
-                const time = data[`r${i}time`];
+                const info = data[`r${i}`];
                 
-                checkbox.checked = state;
-                relay.classList.toggle('active', state);
-                timeSpan.textContent = formatTime(time);
+                relay.classList.toggle('active', info.state);
+                relay.querySelector('.state').textContent = info.state ? 'ON' : 'OFF';
+                relay.querySelector('.mode').textContent = modeNames[info.mode];
+                relay.querySelector('.time').textContent = formatTime(info.time);
+                
+                // Actualizar botones activos
+                const buttons = relay.querySelectorAll('.mode-btn');
+                buttons.forEach((btn, idx) => {
+                    btn.classList.toggle('active', idx === info.mode);
+                });
             }
         }
 
-        function toggleRelay(num, state) {
-            if (!client || !client.connected) {
-                alert('⚠️ No conectado a MQTT');
-                return;
-            }
-            client.publish(`esp32/relay${num}`, state ? 'ON' : 'OFF');
+        function updateConfig(data) {
+            currentSetpoint = data.setpoint;
+            currentHyst = data.hysteresis;
+            
+            document.getElementById('setpointInput').value = data.setpoint;
+            document.getElementById('setpointTemp').textContent = data.setpoint.toFixed(1) + '°C';
+            document.getElementById('hystSlider').value = data.hysteresis;
+            document.getElementById('hystValue').textContent = data.hysteresis.toFixed(1) + '°C';
+            
+            updateTempRanges();
         }
 
-        function toggleAllRelays(state) {
-            if (!client || !client.connected) {
-                alert('⚠️ No conectado a MQTT');
+        function updateSetpoint() {
+            const value = parseFloat(document.getElementById('setpointInput').value);
+            if (isNaN(value) || value < 15 || value > 35) {
+                alert('Temperatura debe estar entre 15-35°C');
                 return;
             }
-            client.publish('esp32/allrelays', state ? 'ON' : 'OFF');
+            
+            currentSetpoint = value;
+            updateTempRanges();
+            
+            const config = {
+                setpoint: value,
+                hysteresis: currentHyst
+            };
+            
+            client.publish('esp32/config/set', JSON.stringify(config));
+            document.getElementById('setpointTemp').textContent = value.toFixed(1) + '°C';
+        }
+
+        function updateHysteresis(value) {
+            currentHyst = parseFloat(value);
+            document.getElementById('hystValue').textContent = value + '°C';
+            updateTempRanges();
+        }
+
+        function updateTempRanges() {
+            const high = currentSetpoint + currentHyst;
+            const low = currentSetpoint - currentHyst;
+            document.getElementById('tempHigh').textContent = high.toFixed(1) + '°C';
+            document.getElementById('tempLow').textContent = low.toFixed(1) + '°C';
+        }
+
+        function setMode(relayIndex, mode) {
+            client.publish(`esp32/relay/${relayIndex + 1}/mode`, String(mode));
         }
 
         function formatTime(seconds) {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
             const s = seconds % 60;
-            return h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+                   return h > 0 
+                ? `${h}h ${m}m` 
+                : m > 0 
+                    ? `${m}m ${s}s` 
+                    : `${s}s`;
         }
 
-        function formatUptime(seconds) {
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.floor((seconds % 86400) / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return days > 0 ? `${days}d ${hours}h` : `${hours}h ${mins}m`;
-        }
-
-        // ===== INICIO =====
-        window.addEventListener('load', () => {
-            initCharts();
+        // ===== INICIALIZACIÓN =====
+        window.onload = () => {
+            initChart();
             connectMQTT();
-            console.log('🚀 Dashboard iniciado');
-        });
+        };
     </script>
 </body>
 </html>
