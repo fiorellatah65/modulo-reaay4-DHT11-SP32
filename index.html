@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Dashboard Pro</title>
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: fadeIn 0.5s;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .status-badge {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.5s;
+        }
+
+        .status-badge.online {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .status-badge.offline {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .pulse.green { background: var(--success); }
+        .pulse.red { background: var(--danger); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid var(--border);
+            animation: fadeInUp 0.5s;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 1.4em;
+            flex: 1;
+        }
+
+        .icon {
+            font-size: 1.8em;
+        }
+
+        .sensor-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .sensor-item {
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid var(--primary);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .sensor-item:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: scale(1.05);
+        }
+
+        .sensor-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 8px;
+        }
+
+        .sensor-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sensor-range {
+            font-size: 0.85em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+
+        .relay-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .relay-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .relay-item.active {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+        }
+
+        .relay-info {
+            flex: 1;
+        }
+
+        .relay-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .relay-time {
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
+
+        .switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #475569;
+            transition: .4s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--success), #059669);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+        }
+
+        .chart-container {
+            height: 250px;
+            margin-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎛️ ESP32 Dashboard Pro</h1>
+        <p style="opacity: 0.7;">Control de Relays & Monitoreo de Sensores</p>
+    </div>
+
+    <div class="status-bar">
+        <div id="mqttStatus" class="status-badge offline">
+            <span class="pulse red"></span>
+            <span>MQTT: Desconectado</span>
+        </div>
+        <div id="esp32Status" class="status-badge offline">
+            <span class="pulse red"></span>
+            <span>ESP32: Offline</span>
+        </div>
+        <div class="status-badge" style="background: rgba(102, 126, 234, 0.2); border: 2px solid var(--primary); color: var(--primary);">
+            <span>⏱️</span>
+            <span id="uptime">--</span>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Sensores -->
+        <div class="card">
+            <div class="card-header">
+                <span class="icon">🌡️</span>
+                <h2>Sensores DHT11</h2>
+            </div>
+            <div class="sensor-grid">
+                <div class="sensor-item">
+                    <div class="sensor-label">Temperatura</div>
+                    <div class="sensor-value" id="temp">--°C</div>
+                    <div class="sensor-range" id="tempRange">Min: -- | Max: --</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="sensor-label">Humedad</div>
+                    <div class="sensor-value" id="hum">--%</div>
+                    <div class="sensor-range" id="humRange">Min: -- | Max: --</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="wifiSignal">--</div>
+                    <div class="stat-label">📶 WiFi (dBm)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="readings">0</div>
+                    <div class="stat-label">📊 Lecturas</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Temperatura -->
+        <div class="card">
+            <div class="card-header">
+                <span class="icon">📈</span>
+                <h2>Temperatura (Tiempo Real)</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico Humedad -->
+        <div class="card">
+            <div class="card-header">
+                <span class="icon">💧</span>
+                <h2>Humedad (Tiempo Real)</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="humChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Control de Relays -->
+        <div class="card">
+            <div class="card-header">
+                <span class="icon">⚡</span>
+                <h2>Control de Relays</h2>
+            </div>
+            
+            <div id="relay1" class="relay-item">
+                <div class="relay-info">
+                    <div class="relay-name">💡 Relay 1</div>
+                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleRelay(1, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div id="relay2" class="relay-item">
+                <div class="relay-info">
+                    <div class="relay-name">🔌 Relay 2</div>
+                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleRelay(2, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div id="relay3" class="relay-item">
+                <div class="relay-info">
+                    <div class="relay-name">🌟 Relay 3</div>
+                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleRelay(3, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div id="relay4" class="relay-item">
+                <div class="relay-info">
+                    <div class="relay-name">⭐ Relay 4</div>
+                    <div class="relay-time">Tiempo activo: <span class="time">0s</span></div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleRelay(4, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button class="btn" onclick="toggleAllRelays(true)">🔆 Encender Todos</button>
+            <button class="btn btn-danger" onclick="toggleAllRelays(false)">🔻 Apagar Todos</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        // ===== CONFIGURACIÓN AUTOMÁTICA =====
+        const MQTT_CONFIG = {
+            host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
+            port: 8884,
+            user: 'esp32user',
+            pass: 'Esp32pass123'
+        };
+
+        let client = null;
+        let tempChart, humChart;
+        let tempData = [], humData = [], labels = [];
+        let maxDataPoints = 20;
+        let readingCount = 0;
+
+        // ===== GRÁFICOS =====
+        function initCharts() {
+            const chartConfig = (label, color) => ({
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: label === 'Temperatura (°C)' ? tempData : humData,
+                        borderColor: color,
+                        backgroundColor: color + '33',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8', maxRotation: 0 }
+                        }
+                    }
+                }
+            });
+
+            tempChart = new Chart(document.getElementById('tempChart'), chartConfig('Temperatura (°C)', '#f59e0b'));
+            humChart = new Chart(document.getElementById('humChart'), chartConfig('Humedad (%)', '#06b6d4'));
+        }
+
+        function updateCharts(temp, hum) {
+            const now = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            if (tempData.length >= maxDataPoints) {
+                tempData.shift();
+                humData.shift();
+                labels.shift();
+            }
+            
+            tempData.push(temp);
+            humData.push(hum);
+            labels.push(now);
+            
+            tempChart.update('none');
+            humChart.update('none');
+        }
+
+        // ===== MQTT =====
+        function connectMQTT() {
+            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+            
+            const options = {
+                username: MQTT_CONFIG.user,
+                password: MQTT_CONFIG.pass,
+                clientId: 'WebDash_' + Math.random().toString(16).substr(2, 8),
+                clean: true,
+                reconnectPeriod: 5000,
+                keepalive: 60
+            };
+
+            client = mqtt.connect(url, options);
+
+            client.on('connect', () => {
+                console.log('✅ Conectado a MQTT');
+                updateStatus('mqttStatus', true);
+                
+                client.subscribe('esp32/sensores');
+                client.subscribe('esp32/status');
+                client.subscribe('esp32/relay/status');
+            });
+
+            client.on('message', (topic, message) => {
+                const msg = message.toString();
+                
+                if (topic === 'esp32/sensores') {
+                    const data = JSON.parse(msg);
+                    updateSensorData(data);
+                } else if (topic === 'esp32/status') {
+                    updateStatus('esp32Status', msg === 'online');
+                } else if (topic === 'esp32/relay/status') {
+                    const data = JSON.parse(msg);
+                    updateRelayStatus(data);
+                }
+            });
+
+            client.on('error', (err) => {
+                console.error('❌ Error MQTT:', err);
+                updateStatus('mqttStatus', false);
+            });
+
+            client.on('close', () => {
+                updateStatus('mqttStatus', false);
+            });
+        }
+
+        function updateStatus(elementId, isOnline) {
+            const el = document.getElementById(elementId);
+            const pulse = el.querySelector('.pulse');
+            const text = el.querySelector('span:last-child');
+            
+            if (isOnline) {
+                el.className = 'status-badge online';
+                pulse.className = 'pulse green';
+                text.textContent = elementId === 'mqttStatus' ? 'MQTT: Conectado' : 'ESP32: Online';
+            } else {
+                el.className = 'status-badge offline';
+                pulse.className = 'pulse red';
+                text.textContent = elementId === 'mqttStatus' ? 'MQTT: Desconectado' : 'ESP32: Offline';
+            }
+        }
+
+        function updateSensorData(data) {
+            document.getElementById('temp').textContent = data.temp.toFixed(1) + '°C';
+            document.getElementById('hum').textContent = data.hum.toFixed(0) + '%';
+            document.getElementById('tempRange').textContent = `Min: ${data.tempMin.toFixed(1)} | Max: ${data.tempMax.toFixed(1)}`;
+            document.getElementById('humRange').textContent = `Min: ${data.humMin.toFixed(0)} | Max: ${data.humMax.toFixed(0)}`;
+            document.getElementById('wifiSignal').textContent = data.wifi;
+            document.getElementById('uptime').textContent = formatUptime(data.uptime);
+            
+            readingCount++;
+            document.getElementById('readings').textContent = readingCount;
+            
+            updateCharts(data.temp, data.hum);
+        }
+
+        function updateRelayStatus(data) {
+            for (let i = 1; i <= 4; i++) {
+                const relay = document.getElementById(`relay${i}`);
+                const checkbox = relay.querySelector('input');
+                const timeSpan = relay.querySelector('.time');
+                const state = data[`r${i}`];
+                const time = data[`r${i}time`];
+                
+                checkbox.checked = state;
+                relay.classList.toggle('active', state);
+                timeSpan.textContent = formatTime(time);
+            }
+        }
+
+        function toggleRelay(num, state) {
+            if (!client || !client.connected) {
+                alert('⚠️ No conectado a MQTT');
+                return;
+            }
+            client.publish(`esp32/relay${num}`, state ? 'ON' : 'OFF');
+        }
+
+        function toggleAllRelays(state) {
+            if (!client || !client.connected) {
+                alert('⚠️ No conectado a MQTT');
+                return;
+            }
+            client.publish('esp32/allrelays', state ? 'ON' : 'OFF');
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            return days > 0 ? `${days}d ${hours}h` : `${hours}h ${mins}m`;
+        }
+
+        // ===== INICIO =====
+        window.addEventListener('load', () => {
+            initCharts();
+            connectMQTT();
+            console.log('🚀 Dashboard iniciado');
+        });
+    </script>
+</body>
+</html>
