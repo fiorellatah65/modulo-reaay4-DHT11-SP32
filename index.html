@@ -645,14 +645,15 @@
         }
 
         function connectMQTT() {
-            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+           const url = `wss://${MQTT_CONFIG.host}:8884/mqtt`;
             
-            client = mqtt.connect(url, {
-                username: MQTT_CONFIG.user,
-                password: MQTT_CONFIG.pass,
-                clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
-                reconnectPeriod: 5000
-            });
+        client = mqtt.connect(url, {
+        username: MQTT_CONFIG.user,
+        password: MQTT_CONFIG.pass,
+        clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
+        reconnectPeriod: 5000,
+        path: '/mqtt'  // ← Esto fuerza el path correcto
+    });
 
             client.on('connect', () => {
                 console.log('✅ MQTT conectado');
