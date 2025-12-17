@@ -1,10 +1,12 @@
 [build]
+  command = "echo 'Deploy successful'"
   publish = "."
-  command = "echo 'No build needed'"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
+
+[functions]
+  directory = "netlify/functions"
 
 [[headers]]
   for = "/*"
@@ -12,14 +14,3 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# Redirect para el webhook del bot
-[[redirects]]
-  from = "/.netlify/functions/telegram-bot"
-  to = "/.netlify/functions/telegram-bot"
-  status = 200
