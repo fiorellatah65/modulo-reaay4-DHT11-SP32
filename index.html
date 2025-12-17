@@ -700,6 +700,9 @@
             client.on('offline', () => {
                 updateStatus('mqttStatus', false, 'MQTT');
             });
+            client.on('error', (err) => {
+    console.error('MQTT Error:', err);
+            });
         }
 
         window.addEventListener('load', () => {
