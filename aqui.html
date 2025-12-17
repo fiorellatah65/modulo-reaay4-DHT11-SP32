@@ -57,6 +57,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            transition: all 0.3s;
         }
 
         .status-badge.online {
@@ -72,9 +73,21 @@
             color: var(--danger);
         }
 
+        .status-badge.connecting {
+            background: rgba(245, 158, 11, 0.2);
+            border: 2px solid var(--warning);
+            color: var(--warning);
+            animation: pulseOrange 1s infinite;
+        }
+
         @keyframes pulseGreen {
             0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
             50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes pulseOrange {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
         }
 
         .pulse {
@@ -85,11 +98,72 @@
 
         .pulse.green { background: var(--success); animation: pulse 2s infinite; }
         .pulse.red { background: var(--danger); }
+        .pulse.orange { background: var(--warning); animation: pulse 1s infinite; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        .diagnostic-panel {
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto 20px;
+            text-align: center;
+        }
+
+        .diagnostic-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            margin: 10px;
+        }
+
+        .diagnostic-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(16, 185, 129, 0.5);
+        }
+
+        .diagnostic-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .diagnostic-log {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .log-item:last-child {
+            border-bottom: none;
+        }
+
+        .log-success { color: var(--success); }
+        .log-error { color: var(--danger); }
+        .log-warning { color: var(--warning); }
+        .log-info { color: var(--info); }
 
         .dashboard {
             display: grid;
@@ -175,12 +249,6 @@
             color: var(--danger);
         }
 
-        .relay-info {
-            font-size: 0.75em;
-            opacity: 0.8;
-            margin-bottom: 8px;
-        }
-
         .relay-controls {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -250,15 +318,18 @@
             opacity: 0.8;
         }
 
-        .instructions {
-            font-size: 0.9em;
-            line-height: 1.5;
-            opacity: 0.9;
+        .history-item {
+            background: rgba(255,255,255,0.03);
+            border-left: 3px solid var(--primary);
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            font-size: 0.85em;
         }
 
-        .instructions ul {
-            margin: 10px 0;
-            padding-left: 20px;
+        .history-time {
+            opacity: 0.6;
+            font-size: 0.9em;
         }
 
         @media (max-width: 768px) {
@@ -267,63 +338,58 @@
     </style>
 </head>
 <body>
-    <!-- versio mjorada -->
     <div class="header">
         <h1>🤖 ESP32 Control Automático</h1>
         <p style="opacity: 0.7; font-size: 0.9em;">Control de clima + voz + historial en tiempo real</p>
     </div>
 
+    <!-- PANEL DE DIAGNÓSTICO -->
+    <div class="diagnostic-panel">
+        <h3 style="margin-bottom: 15px;">🔍 Panel de Diagnóstico y Control</h3>
+        
+        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+            <button class="diagnostic-btn" onclick="runFullDiagnostic()">
+                🚀 Iniciar Diagnóstico Completo
+            </button>
+            <button class="diagnostic-btn" onclick="reconnectAll()" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                🔄 Reconectar Todo
+            </button>
+            <button class="diagnostic-btn" onclick="clearLog()" style="background: linear-gradient(135deg, #6366f1, #4f46e5); padding: 10px 20px; font-size: 0.9em;">
+                🗑️ Limpiar Log
+            </button>
+        </div>
+
+        <div class="diagnostic-log" id="diagnosticLog">
+            <div class="log-item log-info">💡 Presiona "Iniciar Diagnóstico" para verificar todas las conexiones</div>
+        </div>
+    </div>
+
     <div class="status-bar">
         <div id="mqttStatus" class="status-badge offline">
             <span class="pulse red"></span>
-            <span>MQTT</span>
+            <span>MQTT: Desconectado</span>
         </div>
         <div id="esp32Status" class="status-badge offline">
             <span class="pulse red"></span>
-            <span>ESP32</span>
+            <span>ESP32: Offline</span>
         </div>
         <div id="supabaseStatus" class="status-badge offline">
             <span class="pulse red"></span>
-            <span>Supabase</span>
+            <span>Supabase: Desconectado</span>
         </div>
     </div>
 
     <div class="dashboard">
-        <!-- Instrucciones -->
-        <div class="card">
-            <div class="card-header">
-                <span style="font-size: 1.5em;">📋</span>
-                <h2>Cómo Funciona el Sistema</h2>
-            </div>
-            <div class="instructions">
-                <p><strong>Modos de los relays:</strong></p>
-                <ul>
-                    <li><strong>OFF:</strong> Siempre apagado</li>
-                    <li><strong>ON:</strong> Siempre encendido</li>
-                    <li><strong>MANUAL:</strong> Control desde esta web o Telegram</li>
-                    <li><strong>AUTO:</strong> Control automático por temperatura</li>
-                </ul>
-                <p><strong>En modo AUTO:</strong></p>
-                <ul>
-                    <li><strong>Ventilador:</strong> Enciende si temperatura > setpoint + histéresis (enfría)</li>
-                    <li><strong>Calefactor:</strong> Enciende si temperatura < setpoint - histéresis (calienta)</li>
-                    <li><strong>Humidificador y Luz:</strong> Actualmente manual (puedes cambiarlo en el código ESP32)</li>
-                </ul>
-                <p><strong>Control por voz:</strong> Envía nota de voz al bot de Telegram (ej: "¿Qué temperatura hay?" o "Enciende ventilador")</p>
-                <p><strong>Respuesta triple:</strong> Texto + audio en Telegram + voz en parlante físico</p>
-            </div>
-        </div>
-
         <!-- Temperatura -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">🌡️</span>
-                <h2>Temperatura Actual</h2>
+                <h2>Temperatura</h2>
             </div>
             <div class="temp-display">
                 <div class="temp-value" id="currentTemp">--°C</div>
                 <div style="opacity: 0.7; margin-top: 5px; font-size: 0.85em;">
-                    Última actualización: <span id="lastUpdate">--</span>
+                    <span id="lastUpdate">Esperando datos...</span>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center;">
@@ -342,7 +408,7 @@
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📈</span>
-                <h2>Historial Tiempo Real</h2>
+                <h2>Historial</h2>
             </div>
             <div class="chart-container">
                 <canvas id="tempChart"></canvas>
@@ -355,54 +421,37 @@
                 <span style="font-size: 1.5em;">🔌</span>
                 <h2>Dispositivos</h2>
             </div>
-            <div id="relaysContainer"></div>
+            <div id="relaysContainer">
+                <p style="text-align: center; opacity: 0.6;">Esperando datos de relays...</p>
+            </div>
         </div>
 
         <!-- Configuración -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">⚙️</span>
-                <h2>Configuración Automática</h2>
+                <h2>Config Auto</h2>
             </div>
             <div style="margin-bottom: 10px;">
-                <label>🎯 Setpoint (°C) - Temperatura objetivo</label>
+                <label>🎯 Setpoint (°C)</label>
                 <input type="number" id="setpointInput" value="24" min="15" max="35" step="0.5">
             </div>
             <div style="margin-bottom: 10px;">
-                <label>📊 Histéresis (°C) - Margen de tolerancia</label>
+                <label>📊 Histéresis (°C)</label>
                 <input type="number" id="hysteresisInput" value="2" min="0.5" max="5" step="0.5">
             </div>
-            <div style="margin-bottom: 10px;">
-                <label>🔥 Temp Máxima Alerta (°C)</label>
-                <input type="number" id="tempMaxInput" value="30" min="20" max="40" step="1">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label>❄️ Temp Mínima Alerta (°C)</label>
-                <input type="number" id="tempMinInput" value="18" min="10" max="25" step="1">
-            </div>
-            <button class="btn" onclick="updateConfig()">💾 Guardar Configuración</button>
+            <button class="btn" onclick="updateConfig()">💾 Guardar</button>
         </div>
 
-        <!-- Historial Supabase -->
+        <!-- Historial -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📊</span>
-                <h2>Historial (Últimas 10 lecturas)</h2>
-                <button class="btn btn-small" onclick="loadHistory()">🔄 Actualizar</button>
+                <h2>Historial</h2>
+                <button class="btn btn-small" onclick="loadHistory()">🔄</button>
             </div>
             <div id="historyContainer" style="max-height: 300px; overflow-y: auto;">
                 <p style="text-align: center; opacity: 0.6;">Cargando...</p>
-            </div>
-        </div>
-
-        <!-- Alertas -->
-        <div class="card">
-            <div class="card-header">
-                <span style="font-size: 1.5em;">⚠️</span>
-                <h2>Alertas Recientes</h2>
-            </div>
-            <div id="alertsContainer" style="max-height: 250px; overflow-y: auto;">
-                <p style="text-align: center; opacity: 0.6;">Sin alertas</p>
             </div>
         </div>
     </div>
@@ -426,8 +475,225 @@
         let client = null;
         let tempChart;
         let chartData = { labels: [], data: [] };
-        let relayStates = {};
+        let mqttConnected = false;
+        let esp32Online = false;
+        let supabaseConnected = false;
 
+        // ===== FUNCIONES DE LOG =====
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('diagnosticLog');
+            const time = new Date().toLocaleTimeString();
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: '💡' };
+            const item = document.createElement('div');
+            item.className = `log-item log-${type}`;
+            item.textContent = `[${time}] ${icons[type]} ${message}`;
+            log.insertBefore(item, log.firstChild);
+            
+            // Limitar a 50 mensajes
+            if (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('diagnosticLog').innerHTML = '<div class="log-item log-info">💡 Log limpiado</div>';
+        }
+
+        // ===== FUNCIONES DE ESTADO =====
+        function updateStatus(elementId, isOnline, text) {
+            const el = document.getElementById(elementId);
+            const pulse = el.querySelector('.pulse');
+            const span = el.querySelector('span:last-child');
+            
+            if (isOnline) {
+                el.className = 'status-badge online';
+                pulse.className = 'pulse green';
+            } else {
+                el.className = 'status-badge offline';
+                pulse.className = 'pulse red';
+            }
+            if (text) span.textContent = text;
+        }
+
+        function setConnecting(elementId, text) {
+            const el = document.getElementById(elementId);
+            const pulse = el.querySelector('.pulse');
+            const span = el.querySelector('span:last-child');
+            el.className = 'status-badge connecting';
+            pulse.className = 'pulse orange';
+            if (text) span.textContent = text;
+        }
+
+        // ===== MQTT =====
+        function connectMQTT() {
+            return new Promise((resolve, reject) => {
+                addLog('Intentando conectar a MQTT...', 'info');
+                setConnecting('mqttStatus', 'MQTT: Conectando...');
+                
+                const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+                
+                try {
+                    client = mqtt.connect(url, {
+                        username: MQTT_CONFIG.user,
+                        password: MQTT_CONFIG.pass,
+                        clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
+                        reconnectPeriod: 5000,
+                        connectTimeout: 10000
+                    });
+
+                    client.on('connect', () => {
+                        mqttConnected = true;
+                        updateStatus('mqttStatus', true, 'MQTT: Conectado');
+                        addLog('MQTT conectado correctamente', 'success');
+                        
+                        client.subscribe('esp32/sensores');
+                        client.subscribe('esp32/status');
+                        client.subscribe('esp32/relay/status');
+                        client.subscribe('esp32/config');
+                        
+                        addLog('Suscrito a tópicos MQTT', 'success');
+                        resolve(true);
+                    });
+
+                    client.on('message', (topic, message) => {
+                        const msg = message.toString();
+                        
+                        if (topic === 'esp32/status') {
+                            esp32Online = (msg === 'online');
+                            updateStatus('esp32Status', esp32Online, `ESP32: ${esp32Online ? 'Online' : 'Offline'}`);
+                            addLog(`ESP32 está ${esp32Online ? 'online' : 'offline'}`, esp32Online ? 'success' : 'warning');
+                        } 
+                        else if (topic === 'esp32/sensores') {
+                            const data = JSON.parse(msg);
+                            document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
+                            document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
+                            document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
+                            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
+
+                            const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                            chartData.labels.push(time);
+                            chartData.data.push(data.temp);
+                            if (chartData.labels.length > 20) {
+                                chartData.labels.shift();
+                                chartData.data.shift();
+                            }
+                            tempChart.update();
+                        }
+                        else if (topic === 'esp32/relay/status') {
+                            updateRelaysUI(JSON.parse(msg));
+                        }
+                        else if (topic === 'esp32/config') {
+                            const data = JSON.parse(msg);
+                            document.getElementById('setpointInput').value = data.setpoint;
+                            document.getElementById('hysteresisInput').value = data.hysteresis;
+                        }
+                    });
+
+                    client.on('error', (error) => {
+                        mqttConnected = false;
+                        updateStatus('mqttStatus', false, 'MQTT: Error');
+                        addLog(`Error MQTT: ${error.message}`, 'error');
+                        reject(error);
+                    });
+
+                    client.on('offline', () => {
+                        mqttConnected = false;
+                        updateStatus('mqttStatus', false, 'MQTT: Desconectado');
+                        addLog('MQTT desconectado', 'warning');
+                    });
+
+                    client.on('reconnect', () => {
+                        addLog('Reintentando conexión MQTT...', 'info');
+                        setConnecting('mqttStatus', 'MQTT: Reconectando...');
+                    });
+
+                    setTimeout(() => {
+                        if (!mqttConnected) {
+                            addLog('Timeout de conexión MQTT', 'error');
+                            reject(new Error('Timeout'));
+                        }
+                    }, 10000);
+
+                } catch (error) {
+                    addLog(`Error iniciando MQTT: ${error.message}`, 'error');
+                    updateStatus('mqttStatus', false, 'MQTT: Error');
+                    reject(error);
+                }
+            });
+        }
+
+        // ===== SUPABASE =====
+        async function testSupabase() {
+            addLog('Verificando conexión a Supabase...', 'info');
+            setConnecting('supabaseStatus', 'Supabase: Verificando...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .limit(1);
+
+                if (error) throw error;
+
+                supabaseConnected = true;
+                updateStatus('supabaseStatus', true, 'Supabase: Conectado');
+                addLog('Supabase conectado correctamente', 'success');
+                return true;
+            } catch (error) {
+                supabaseConnected = false;
+                updateStatus('supabaseStatus', false, 'Supabase: Error');
+                addLog(`Error Supabase: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // ===== DIAGNÓSTICO COMPLETO =====
+        async function runFullDiagnostic() {
+            addLog('====== INICIANDO DIAGNÓSTICO COMPLETO ======', 'info');
+            
+            // 1. MQTT
+            try {
+                await connectMQTT();
+            } catch (error) {
+                addLog('Fallo en conexión MQTT', 'error');
+            }
+
+            // Esperar 2 segundos
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // 2. Supabase
+            await testSupabase();
+
+            // Esperar 2 segundos
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // 3. Cargar datos
+            await loadHistory();
+
+            // 4. Resumen
+            addLog('====== RESUMEN DIAGNÓSTICO ======', 'info');
+            addLog(`MQTT: ${mqttConnected ? '✅ OK' : '❌ FALLO'}`, mqttConnected ? 'success' : 'error');
+            addLog(`ESP32: ${esp32Online ? '✅ OK' : '❌ OFFLINE'}`, esp32Online ? 'success' : 'warning');
+            addLog(`Supabase: ${supabaseConnected ? '✅ OK' : '❌ FALLO'}`, supabaseConnected ? 'success' : 'error');
+
+            if (mqttConnected && supabaseConnected) {
+                addLog('🎉 SISTEMA COMPLETAMENTE FUNCIONAL', 'success');
+            } else {
+                addLog('⚠️ Algunos servicios no están disponibles', 'warning');
+            }
+        }
+
+        async function reconnectAll() {
+            addLog('🔄 Reconectando todos los servicios...', 'info');
+            
+            if (client) {
+                client.end(true);
+            }
+            
+            await runFullDiagnostic();
+        }
+
+        // ===== OTRAS FUNCIONES =====
         function initChart() {
             tempChart = new Chart(document.getElementById('tempChart'), {
                 type: 'line',
@@ -448,46 +714,16 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            beginAtZero: false,
-                            grid: { color: '#334155' },
-                            ticks: { color: '#94a3b8' }
-                        },
-                        x: {
-                            grid: { color: '#334155' },
-                            ticks: { color: '#94a3b8', maxRotation: 0 }
-                        }
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
                     }
                 }
             });
         }
 
-        function updateStatus(elementId, isOnline, text) {
-            const el = document.getElementById(elementId);
-            const pulse = el.querySelector('.pulse');
-            const span = el.querySelector('span:last-child');
-            
-            if (isOnline) {
-                el.className = 'status-badge online';
-                pulse.className = 'pulse green';
-            } else {
-                el.className = 'status-badge offline';
-                pulse.className = 'pulse red';
-            }
-            if (text) span.textContent = text;
-        }
-
         function updateRelaysUI(data) {
-            relayStates = data;
             const container = document.getElementById('relaysContainer');
             container.innerHTML = '';
-
-            const autoInfo = [
-                "En AUTO: Se enciende si temp > setpoint + histéresis (enfriar)",
-                "En AUTO: Se enciende si temp < setpoint - histéresis (calentar)",
-                "En AUTO: Manual (configurable en código)",
-                "En AUTO: Manual (configurable en código)"
-            ];
 
             for (let i = 1; i <= 4; i++) {
                 const relay = data[`r${i}`];
@@ -495,19 +731,12 @@
 
                 const stateClass = relay.state ? 'on' : 'off';
                 const stateText = relay.state ? '🟢 ON' : '🔴 OFF';
-                const time = formatTime(relay.time);
-                const modeText = getModeText(relay.mode);
-                const info = relay.mode === 2 ? autoInfo[i-1] : "";
 
                 container.innerHTML += `
                     <div class="relay-control">
                         <div class="relay-header">
                             <span class="relay-name">${relay.name}</span>
                             <span class="relay-state ${stateClass}">${stateText}</span>
-                        </div>
-                        <div class="relay-info">
-                            Tiempo ON: ${time} | Modo: ${modeText}
-                            ${info ? '<br><small style="opacity:0.8;">' + info + '</small>' : ''}
                         </div>
                         <div class="relay-controls">
                             <button class="btn btn-on btn-small" onclick="controlRelay(${i}, 'ON')">ON</button>
@@ -524,44 +753,45 @@
             }
         }
 
-        function getModeText(mode) {
-            return ['OFF', 'ON', 'AUTO', 'MANUAL'][mode] || 'UNK';
-        }
-
-        function formatTime(seconds) {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = seconds % 60;
-            return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-        }
-
         function controlRelay(num, state) {
             if (client && client.connected) {
                 client.publish(`esp32/relay/${num}/cmd`, state);
+                addLog(`Comando enviado: Relay ${num} → ${state}`, 'info');
+            } else {
+                addLog('Error: MQTT no conectado', 'error');
+                alert('⚠️ MQTT no está conectado. Presiona "Reconectar Todo"');
             }
         }
 
         function setMode(num, mode) {
             if (client && client.connected) {
                 client.publish(`esp32/relay/${num}/mode`, mode.toString());
+                addLog(`Modo cambiado: Relay ${num} → Modo ${mode}`, 'info');
+            } else {
+                addLog('Error: MQTT no conectado', 'error');
+                alert('⚠️ MQTT no está conectado. Presiona "Reconectar Todo"');
             }
         }
 
         function updateConfig() {
             const config = {
                 setpoint: parseFloat(document.getElementById('setpointInput').value),
-                hysteresis: parseFloat(document.getElementById('hysteresisInput').value),
-                tempMax: parseFloat(document.getElementById('tempMaxInput').value),
-                tempMin: parseFloat(document.getElementById('tempMinInput').value)
+                hysteresis: parseFloat(document.getElementById('hysteresisInput').value)
             };
 
             if (client && client.connected) {
                 client.publish('esp32/config/set', JSON.stringify(config));
+                addLog(`Configuración actualizada: Setpoint ${config.setpoint}°C, Histéresis ${config.hysteresis}°C`, 'success');
                 alert('✅ Configuración guardada');
+            } else {
+                addLog('Error: MQTT no conectado', 'error');
+                alert('⚠️ MQTT no está conectado. Presiona "Reconectar Todo"');
             }
         }
 
         async function loadHistory() {
+            addLog('Cargando historial desde Supabase...', 'info');
+            
             try {
                 const { data, error } = await supabase
                     .from('sensor_readings')
@@ -572,128 +802,67 @@
                 if (error) throw error;
 
                 const container = document.getElementById('historyContainer');
+                
                 if (!data || data.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos</p>';
+                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos en historial</p>';
+                    addLog('Historial vacío', 'warning');
                     return;
                 }
 
-                updateStatus('supabaseStatus', true, 'Supabase');
+                supabaseConnected = true;
+                updateStatus('supabaseStatus', true, 'Supabase: Conectado');
 
                 container.innerHTML = data.map(r => `
                     <div class="history-item">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <div style="display: flex; justify-content: space-between;">
                             <strong>🌡️ ${r.temperatura.toFixed(1)}°C</strong>
                             <span>💧 ${r.humedad.toFixed(0)}%</span>
                         </div>
-                        <div class="history-time">
-                            ${new Date(r.created_at).toLocaleString('es-PE')}
-                        </div>
+                        <div class="history-time">${new Date(r.created_at).toLocaleString('es-PE')}</div>
                     </div>
                 `).join('');
 
-            } catch (error) {
-                console.error('Error:', error);
-                updateStatus('supabaseStatus', false, 'Supabase');
-            }
-        }
-
-        async function loadAlerts() {
-            try {
-                const { data } = await supabase
-                    .from('system_alerts')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-
-                const container = document.getElementById('alertsContainer');
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">✅ Sin alertas</p>';
-                    return;
-                }
-
-                container.innerHTML = data.map(a => `
-                    <div class="alert-item">
-                        <div style="font-weight: 600; margin-bottom: 3px;">
-                            ${a.severity === 'DANGER' ? '🚨' : '⚠️'} ${a.alert_type}
-                        </div>
-                        <div style="opacity: 0.8; font-size: 0.9em;">${a.message}</div>
-                        <div class="history-time">
-                            ${new Date(a.created_at).toLocaleString('es-PE')}
-                        </div>
-                    </div>
-                `).join('');
+                addLog(`Historial cargado: ${data.length} registros`, 'success');
 
             } catch (error) {
                 console.error('Error:', error);
+                updateStatus('supabaseStatus', false, 'Supabase: Error');
+                addLog(`Error cargando historial: ${error.message}`, 'error');
+                document.getElementById('historyContainer').innerHTML = '<p style="text-align: center; opacity: 0.6; color: var(--danger);">❌ Error al cargar historial</p>';
             }
         }
 
-        function connectMQTT() {
-            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
-            
-            client = mqtt.connect(url, {
-                username: MQTT_CONFIG.user,
-                password: MQTT_CONFIG.pass,
-                clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
-                reconnectPeriod: 5000
-            });
-
-            client.on('connect', () => {
-                console.log('✅ MQTT conectado');
-                updateStatus('mqttStatus', true, 'MQTT');
-                
-                client.subscribe('esp32/sensores');
-                client.subscribe('esp32/status');
-                client.subscribe('esp32/relay/status');
-                client.subscribe('esp32/config');
-            });
-
-            client.on('message', (topic, message) => {
-                const msg = message.toString();
-                
-                if (topic === 'esp32/status') {
-                    updateStatus('esp32Status', msg === 'online', 'ESP32');
-                } 
-                else if (topic === 'esp32/sensores') {
-                    const data = JSON.parse(msg);
-                    document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
-                    document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
-                    document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
-                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
-
-                    const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-                    chartData.labels.push(time);
-                    chartData.data.push(data.temp);
-                    if (chartData.labels.length > 20) {
-                        chartData.labels.shift();
-                        chartData.data.shift();
-                    }
-                    tempChart.update();
-                }
-                else if (topic === 'esp32/relay/status') {
-                    updateRelaysUI(JSON.parse(msg));
-                }
-                else if (topic === 'esp32/config') {
-                    const data = JSON.parse(msg);
-                    document.getElementById('setpointInput').value = data.setpoint;
-                    document.getElementById('hysteresisInput').value = data.hysteresis;
-                }
-            });
-
-            client.on('offline', () => {
-                updateStatus('mqttStatus', false, 'MQTT');
-            });
-        }
-
+        // ===== INICIALIZACIÓN =====
         window.addEventListener('load', () => {
-            initChart();
-            connectMQTT();
-            loadHistory();
-            loadAlerts();
+            addLog('🚀 Aplicación iniciada', 'success');
+            addLog('Inicializando gráfico...', 'info');
             
-            setInterval(loadHistory, 60000);
-            setInterval(loadAlerts, 30000);
+            initChart();
+            
+            addLog('✅ Gráfico inicializado', 'success');
+            addLog('💡 Presiona "Iniciar Diagnóstico Completo" para conectar todo', 'info');
+            
+            // Auto-conectar después de 2 segundos
+            setTimeout(() => {
+                addLog('🔄 Iniciando conexión automática...', 'info');
+                runFullDiagnostic();
+            }, 2000);
         });
+
+        // Reconectar automáticamente cada 30 segundos si está desconectado
+        setInterval(() => {
+            if (!mqttConnected) {
+                addLog('🔄 Auto-reconexión MQTT...', 'info');
+                connectMQTT().catch(() => {});
+            }
+        }, 30000);
+
+        // Verificar Supabase cada 60 segundos
+        setInterval(() => {
+            if (supabaseConnected) {
+                loadHistory();
+            }
+        }, 60000);
     </script>
 </body>
 </html>
