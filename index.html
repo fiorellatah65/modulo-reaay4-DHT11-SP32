@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Control + Bot Telegram</title>
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .connect-panel {
+            background: var(--card);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid var(--border);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .connect-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .connect-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .connect-btn.connected {
+            background: linear-gradient(135deg, var(--success), #059669);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-indicator.online {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.offline {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge.online {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .status-badge.offline {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 15px;
+            padding: 18px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 1.2em;
+            flex: 1;
+        }
+
+        .temp-display {
+            text-align: center;
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+
+        .temp-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .relay-control {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .relay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .relay-name {
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .relay-state {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .relay-state.on {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .relay-state.off {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .relay-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-on { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-off { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .btn-small { padding: 5px 10px; font-size: 0.75em; }
+
+        .mode-selector {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 5px;
+            font-size: 0.7em;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: var(--primary);
+        }
+
+        .chart-container {
+            height: 200px;
+            margin-top: 12px;
+        }
+
+        .bot-panel {
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .bot-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .bot-input input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--border);
+            color: white;
+            font-size: 1em;
+        }
+
+        .bot-history {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .bot-message {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .bot-message.user {
+            background: rgba(102, 126, 234, 0.2);
+            border-left: 3px solid var(--primary);
+        }
+
+        .bot-message.bot {
+            background: rgba(16, 185, 129, 0.2);
+            border-left: 3px solid var(--success);
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--border);
+            color: white;
+            font-size: 1em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .connect-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 ESP32 Control Unificado + Bot</h1>
+        <p style="opacity: 0.7; font-size: 0.9em;">Panel de Control Completo con Bot Telegram Integrado</p>
+    </div>
+
+    <div class="connect-panel">
+        <h3 style="margin-bottom: 15px; text-align: center;">🔌 Conexión de Servicios</h3>
+        <div class="connect-grid">
+            <button class="connect-btn" id="mqttConnectBtn" onclick="connectMQTT()">
+                <span class="status-indicator offline" id="mqttIndicator"></span>
+                <span>Conectar MQTT</span>
+            </button>
+            <button class="connect-btn" id="supabaseConnectBtn" onclick="connectSupabase()">
+                <span class="status-indicator offline" id="supabaseIndicator"></span>
+                <span>Conectar Supabase</span>
+            </button>
+            <button class="connect-btn" id="botConnectBtn" onclick="connectBot()">
+                <span class="status-indicator offline" id="botIndicator"></span>
+                <span>Activar Bot</span>
+            </button>
+        </div>
+        <div style="text-align: center; font-size: 0.85em; opacity: 0.7;">
+            💡 Haz clic en cada botón para conectar los servicios
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div id="mqttStatus" class="status-badge offline">
+            <span>MQTT: Desconectado</span>
+        </div>
+        <div id="esp32Status" class="status-badge offline">
+            <span>ESP32: Offline</span>
+        </div>
+        <div id="supabaseStatus" class="status-badge offline">
+            <span>Supabase: Desconectado</span>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">🤖</span>
+                <h2>Bot de Telegram</h2>
+            </div>
+            <div class="bot-panel">
+                <div class="bot-input">
+                    <input type="text" id="botCommandInput" placeholder="Escribe un comando (ej: temperatura, enciende luz)" onkeypress="if(event.key==='Enter') sendBotCommand()">
+                    <button class="btn" onclick="sendBotCommand()">📤 Enviar</button>
+                </div>
+                <div style="margin-bottom: 10px; font-size: 0.85em; opacity: 0.8;">
+                    <strong>Comandos disponibles:</strong><br>
+                    • temperatura / temp<br>
+                    • humedad / estado<br>
+                    • enciende [ventilador/calefactor/luz/todo]<br>
+                    • apaga [ventilador/calefactor/luz/todo]
+                </div>
+                <div class="bot-history" id="botHistory">
+                    <div class="bot-message bot">
+                        <div style="font-weight: 600; margin-bottom: 5px;">🤖 Bot</div>
+                        <div>¡Hola! Escribe un comando para controlar el sistema.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">🌡️</span>
+                <h2>Temperatura Actual</h2>
+            </div>
+            <div class="temp-display">
+                <div class="temp-value" id="currentTemp">--°C</div>
+                <div style="opacity: 0.7; margin-top: 5px; font-size: 0.85em;">
+                    Última actualización: <span id="lastUpdate">--</span>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center;">
+                <div>
+                    <div style="opacity: 0.7; font-size: 0.8em;">Humedad</div>
+                    <div style="font-size: 1.3em; font-weight: bold; color: var(--info);" id="currentHum">--%</div>
+                </div>
+                <div>
+                    <div style="opacity: 0.7; font-size: 0.8em;">Setpoint</div>
+                    <div style="font-size: 1.3em; font-weight: bold; color: var(--warning);" id="setpoint">--°C</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">📈</span>
+                <h2>Historial Tiempo Real</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">🔌</span>
+                <h2>Dispositivos</h2>
+            </div>
+            <div id="relaysContainer">
+                <p style="text-align: center; opacity: 0.6;">Conecta MQTT para ver dispositivos</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">⚙️</span>
+                <h2>Configuración</h2>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>🎯 Setpoint (°C)</label>
+                <input type="number" id="setpointInput" value="24" min="15" max="35" step="0.5">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>📊 Histéresis (°C)</label>
+                <input type="number" id="hysteresisInput" value="2" min="0.5" max="5" step="0.5">
+            </div>
+            <button class="btn" onclick="updateConfig()">💾 Guardar</button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span style="font-size: 1.5em;">📊</span>
+                <h2>Historial</h2>
+                <button class="btn btn-small" onclick="loadHistory()">🔄</button>
+            </div>
+            <div id="historyContainer" style="max-height: 300px; overflow-y: auto;">
+                <p style="text-align: center; opacity: 0.6;">Conecta Supabase para ver historial</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const MQTT_CONFIG = {
+            host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
+            port: 8884,
+            user: 'esp32user',
+            pass: 'Esp32pass123'
+        };
+
+        const SUPABASE_URL = 'https://yxwinzfhokugvtpmvyqz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d2luemZob2t1Z3Z0cG12eXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MzIyNjcsImV4cCI6MjA4MTQwODI2N30.xbNWsxmQ4MwbjaQgzfZLkvLE66XqaANiUD4pggr43Vg';
+
+        let client = null;
+        let supabase = null;
+        let tempChart;
+        let chartData = { labels: [], data: [] };
+        let relayStates = {};
+        let latestSensorData = { temp: 0, hum: 0, setpoint: 24, alert: 'OK' };
+        let botActive = false;
+
+        window.addEventListener('load', () => {
+            initChart();
+        });
+
+        function initChart() {
+            tempChart = new Chart(document.getElementById('tempChart'), {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Temp',
+                        data: chartData.data,
+                        borderColor: '#f59e0b',
+                        backgroundColor: '#f59e0b33',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8', maxRotation: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function connectMQTT() {
+            if (client && client.connected) {
+                addBotMessage('bot', '✅ MQTT ya está conectado');
+                return;
+            }
+
+            const btn = document.getElementById('mqttConnectBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="status-indicator offline"></span><span>Conectando...</span>';
+
+            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+            
+            client = mqtt.connect(url, {
+                username: MQTT_CONFIG.user,
+                password: MQTT_CONFIG.pass,
+                clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
+                reconnectPeriod: 5000
+            });
+
+            client.on('connect', () => {
+                console.log('✅ MQTT conectado');
+                updateConnectionStatus('mqtt', true);
+                
+                client.subscribe('esp32/sensores');
+                client.subscribe('esp32/status');
+                client.subscribe('esp32/relay/status');
+                client.subscribe('esp32/config');
+
+                btn.classList.add('connected');
+                btn.innerHTML = '<span class="status-indicator online"></span><span>MQTT Conectado</span>';
+                btn.disabled = false;
+
+                addBotMessage('bot', '✅ MQTT conectado correctamente');
+            });
+
+            client.on('message', (topic, message) => {
+                const msg = message.toString();
+                
+                if (topic === 'esp32/status') {
+                    updateConnectionStatus('esp32', msg === 'online');
+                } 
+                else if (topic === 'esp32/sensores') {
+                    const data = JSON.parse(msg);
+                    latestSensorData = data;
+                    
+                    document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
+                    document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
+                    document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
+
+                    const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                    chartData.labels.push(time);
+                    chartData.data.push(data.temp);
+                    if (chartData.labels.length > 20) {
+                        chartData.labels.shift();
+                        chartData.data.shift();
+                    }
+                    tempChart.update();
+                }
+                else if (topic === 'esp32/relay/status') {
+                    relayStates = JSON.parse(msg);
+                    updateRelaysUI(relayStates);
+                }
+                else if (topic === 'esp32/config') {
+                    const data = JSON.parse(msg);
+                    document.getElementById('setpointInput').value = data.setpoint;
+                    document.getElementById('hysteresisInput').value = data.hysteresis;
+                }
+            });
+
+            client.on('offline', () => {
+                updateConnectionStatus('mqtt', false);
+                btn.classList.remove('connected');
+                btn.innerHTML = '<span class="status-indicator offline"></span><span>Reconectando...</span>';
+            });
+
+            client.on('error', (err) => {
+                console.error('❌ Error MQTT:', err);
+                btn.disabled = false;
+                btn.innerHTML = '<span class="status-indicator offline"></span><span>Error - Reintentar</span>';
+                addBotMessage('bot', '❌ Error conectando MQTT');
+            });
+        }
+
+        function connectSupabase() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                updateConnectionStatus('supabase', true);
+                
+                const btn = document.getElementById('supabaseConnectBtn');
+                btn.classList.add('connected');
+                btn.innerHTML = '<span class="status-indicator online"></span><span>Supabase Conectado</span>';
+                
+                loadHistory();
+                addBotMessage('bot', '✅ Supabase conectado correctamente');
+            } catch (error) {
+                console.error('❌ Error Supabase:', error);
+                addBotMessage('bot', '❌ Error conectando Supabase');
+            }
+        }
+
+        function connectBot() {
+            botActive = true;
+            const btn = document.getElementById('botConnectBtn');
+            btn.classList.add('connected');
+            btn.innerHTML = '<span class="status-indicator online"></span><span>Bot Activo</span>';
+            
+            addBotMessage('bot', '✅ Bot activado. Escribe comandos en el panel.');
+        }
+
+        function sendBotCommand() {
+            const input = document.getElementById('botCommandInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+            
+            addBotMessage('user', text);
+            input.value = '';
+            
+            const response = processBotCommand(text);
+            
+            setTimeout(() => {
+                addBotMessage('bot', response);
+            }, 500);
+        }
+
+        function processBotCommand(text) {
+            const t = text.toLowerCase();
+            
+            if (t.includes('temperatura') || t.includes('temp') || t.includes('grados')) {
+                return `🌡️ La temperatura actual es ${latestSensorData.temp.toFixed(1)}°C y la humedad es ${latestSensorData.hum.toFixed(0)}%`;
+            }
+            
+            if (t.includes('humedad')) {
+                return `💧 La humedad actual es del ${latestSensorData.hum.toFixed(0)}%`;
+            }
+            
+            if (t.includes('estado') || t.includes('sistema')) {
+                return `✅ Sistema funcionando. Temperatura: ${latestSensorData.temp.toFixed(1)}°C, Humedad: ${latestSensorData.hum.toFixed(0)}%`;
+            }
+            
+            if (t.includes('enciende') || t.includes('prende')) {
+                if (t.includes('ventilador') || t.includes('1')) {
+                    controlRelay(1, 'ON');
+                    return '✅ He encendido el ventilador';
+                }
+                if (t.includes('calefactor') || t.includes('2')) {
+                    controlRelay(2, 'ON');
+                    return '✅ He encendido el calefactor';
+                }
+                if (t.includes('luz') || t.includes('4')) {
+                    controlRelay(4, 'ON');
+                    return '✅ He encendido la luz';
+                }
+                if (t.includes('todo')) {
+                    for (let i = 1; i <= 4; i++) controlRelay(i, 'ON');
+                    return '✅ He encendido todos los dispositivos';
+                }
+                return '❓ No entendí qué dispositivo encender. Especifica: ventilador, calefactor, luz o todo';
+            }
+            
+            if (t.includes('apaga')) {
+                if (t.includes('ventilador') || t.includes('1')) {
+                    controlRelay(1, 'OFF');
+                    return '✅ He apagado el ventilador';
+                }
+                if (t.includes('calefactor') || t.includes('2')) {
+                    controlRelay(2, 'OFF');
+                    return '✅ He apagado el calefactor';
+                }
+                if (t.includes('luz') || t.includes('4')) {
+                    controlRelay(4, 'OFF');
+                    return '✅ He apagado la luz';
+                }
+                if (t.includes('todo')) {
+                    for (let i = 1; i <= 4; i++) controlRelay(i, 'OFF');
+                    return '✅ He apagado todos los dispositivos';
+                }
+                return '❓ No entendí qué dispositivo apagar';
+            }
+            
+            return '❓ No entendí tu comando. Prueba: temperatura, estado, enciende [dispositivo], apaga [dispositivo]';
+        }
+
+        function addBotMessage(type, text) {
+            const history = document.getElementById('botHistory');
+            const msg = document.createElement('div');
+            msg.className = `bot-message ${type}`;
+            
+            const label = type === 'user' ? '👤 Tú' : '🤖 Bot';
+            msg.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 5px;">${label}</div>
+                <div>${text}</div>
+            `;
+            
+            history.appendChild(msg);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function updateConnectionStatus(service, isOnline) {
+            const statusMap = {
+                'mqtt': 'mqttStatus',
+                'esp32': 'esp32Status',
+                'supabase': 'supabaseStatus'
+            };
+            
+            const indicatorMap = {
+                'mqtt': 'mqttIndicator',
+                'esp32': null,
+                'supabase': 'supabaseIndicator'
+            };
+            
+            const el = document.getElementById(statusMap[service]);
+            if (el) {
+                el.className = isOnline ? 'status-badge online' : 'status-badge offline';
+                const text = {
+                    'mqtt': isOnline ? 'MQTT: Conectado' : 'MQTT: Desconectado',
+                    'esp32': isOnline ? 'ESP32: Online' : 'ESP32: Offline',
+                    'supabase': isOnline ? 'Supabase: Conectado' : 'Supabase: Desconectado'
+                };
+                el.innerHTML = `<span>${text[service]}</span>`;
+            }
+            
+            if (indicatorMap[service]) {
+                const indicator = document.getElementById(indicatorMap[service]);
+                if (indicator) {
+                    indicator.className = isOnline ? 'status-indicator online' : 'status-indicator offline';
+                }
+            }
+        }
+
+        function controlRelay(num, state) {
+            if (client && client.connected) {
+                client.publish(`esp32/relay/${num}/cmd`, state);
+            } else {
+                addBotMessage('bot', '❌ MQTT no está conectado');
+            }
+        }
+
+        function setMode(num, mode) {
+            if (client && client.connected) {
+                client.publish(`esp32/relay/${num}/mode`, mode.toString());
+            }
+        }
+
+        function updateConfig() {
+            const config = {
+                setpoint: parseFloat(document.getElementById('setpointInput').value),
+                hysteresis: parseFloat(document.getElementById('hysteresisInput').value)
+            };
+
+            if (client && client.connected) {
+                client.publish('esp32/config/set', JSON.stringify(config));
+                addBotMessage('bot', '✅ Configuración guardada');
+            } else {
+                addBotMessage('bot', '❌ MQTT no está conectado');
+            }
+        }
+
+        function updateRelaysUI(data) {
+            relayStates = data;
+            const container = document.getElementById('relaysContainer');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 4; i++) {
+                const relay = data[`r${i}`];
+                if (!relay) continue;
+
+                const stateClass = relay.state ? 'on' : 'off';
+                const stateText = relay.state ? '🟢 ON' : '🔴 OFF';
+                const time = formatTime(relay.time);
+                const modeText = getModeText(relay.mode);
+
+                container.innerHTML += `
+                    <div class="relay-control">
+                        <div class="relay-header">
+                            <span class="relay-name">${relay.name}</span>
+                            <span class="relay-state ${stateClass}">${stateText}</span>
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.8; margin-bottom: 8px;">
+                            Tiempo ON: ${time} | Modo: ${modeText}
+                        </div>
+                        <div class="relay-controls">
+                            <button class="btn btn-on btn-small" onclick="controlRelay(${i}, 'ON')">ON</button>
+                            <button class="btn btn-off btn-small" onclick="controlRelay(${i}, 'OFF')">OFF</button>
+                        </div>
+                        <div class="mode-selector">
+                            <button class="btn mode-btn ${relay.mode === 0 ? 'active' : ''}" onclick="setMode(${i}, 0)">OFF</button>
+                            <button class="btn mode-btn ${relay.mode === 1 ? 'active' : ''}" onclick="setMode(${i}, 1)">ON</button>
+                            <button class="btn mode-btn ${relay.mode === 2 ? 'active' : ''}" onclick="setMode(${i}, 2)">AUTO</button>
+                            <button class="btn mode-btn ${relay.mode === 3 ? 'active' : ''}" onclick="setMode(${i}, 3)">MAN</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function getModeText(mode) {
+            return ['OFF', 'ON', 'AUTO', 'MANUAL'][mode] || 'UNK';
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+        }
+
+        async function loadHistory() {
+            if (!supabase) {
+                addBotMessage('bot', '❌ Supabase no está conectado');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (error) throw error;
+
+                const container = document.getElementById('historyContainer');
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos</p>';
+                    return;
+                }
+
+                container.innerHTML = data.map(r => `
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                            <strong>🌡️ ${r.temperatura.toFixed(1)}°C</strong>
+                            <span>💧 ${r.humedad.toFixed(0)}%</span>
+                        </div>
+                        <div style="opacity: 0.7; font-size: 0.8em;">
+                            ${new Date(r.created_at).toLocaleString('es-PE')}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error:', error);
+                addBotMessage('bot', '❌ Error cargando historial');
+            }
+        }
+    </script>
+</body>
+</html>
