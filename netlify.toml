@@ -1,15 +1,25 @@
-
 [build]
-  publish = "public"
+  publish = "."
+  command = "echo 'No build needed'"
   functions = "netlify/functions"
 
+[build.environment]
+  NODE_VERSION = "18"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  from = "/*"
+  to = "/index.html"
   status = 200
 
-[functions]
-  node_bundler = "esbuild"
-
-# Variables de entorno (configurar en Netlify UI)
-# TELEGRAM_TOKEN = "8491255978:AAFfDy6smKSAhkcGjtX8HxHh6cXe9RB4Y44"
+# Redirect para el webhook del bot
+[[redirects]]
+  from = "/.netlify/functions/telegram-bot"
+  to = "/.netlify/functions/telegram-bot"
+  status = 200
