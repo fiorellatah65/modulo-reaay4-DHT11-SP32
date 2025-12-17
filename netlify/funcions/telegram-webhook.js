@@ -1,3 +1,4 @@
+// proyecto/netlify/functions/telegram-webhook.js
 /**
  * 🤖 BOT TELEGRAM EN JAVASCRIPT PARA NETLIFY FUNCTIONS
  * Webhook que recibe mensajes y responde con texto + audio
