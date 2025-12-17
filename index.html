@@ -412,7 +412,7 @@
     <script>
         const MQTT_CONFIG = {
             host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
-            port: 8884,
+            port: 8084,
             user: 'esp32user',
             pass: 'Esp32pass123'
         };
@@ -628,7 +628,7 @@
         }
 
         function connectMQTT() {
-            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+            const url = `wss://${MQTT_CONFIG.host}:8084/mqtt`;
             
             client = mqtt.connect(url, {
                 username: MQTT_CONFIG.user,
