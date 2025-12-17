@@ -1,5 +1,4 @@
 [build]
-  # No build command needed
   publish = "."
   functions = "netlify/functions"
 
@@ -14,7 +13,14 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Redirect para SPA (opcional)
+# Redirigir raíz a debug-mqtt.html
+[[redirects]]
+  from = "/"
+  to = "/debug-mqtt.html"
+  status = 200
+  force = true
+
+# SPA fallback para otras rutas
 [[redirects]]
   from = "/*"
   to = "/index.html"
