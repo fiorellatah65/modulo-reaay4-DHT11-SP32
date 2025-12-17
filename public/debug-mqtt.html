@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug MQTT - Netlify</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { color: #4ecca3; }
+        .log {
+            background: #0f3460;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 4px solid #16213e;
+            font-size: 14px;
+        }
+        .success { border-left-color: #4ecca3; background: #0d3d2d; }
+        .error { border-left-color: #ee4540; background: #3d0d0d; }
+        .warning { border-left-color: #f59e0b; background: #3d2d0d; }
+        .info { border-left-color: #06b6d4; background: #0d2d3d; }
+        button {
+            background: #4ecca3;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #3dbb92; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #4ecca3;
+        }
+        .stat-label {
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+        code {
+            background: #16213e;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico MQTT para Netlify</h1>
+    <p>Este script detecta problemas de conexión MQTT en producción</p>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="statusMQTT">🔴</div>
+            <div class="stat-label">Estado MQTT</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="msgCount">0</div>
+            <div class="stat-label">Mensajes Recibidos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="timeConnected">0s</div>
+            <div class="stat-label">Tiempo Conectado</div>
+        </div>
+    </div>
+
+    <button onclick="testConnection()">🚀 Test Conexión MQTT</button>
+    <button onclick="testSupabase()">🗄️ Test Supabase</button>
+    <button onclick="clearLogs()">🗑️ Limpiar Logs</button>
+
+    <h2>📋 Logs en Tiempo Real:</h2>
+    <div id="logs"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const MQTT_CONFIG = {
+            host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
+            port: 8884,
+            user: 'esp32user',
+            pass: 'Esp32pass123'
+        };
+
+        const SUPABASE_URL = 'https://yxwinzfhokugvtpmvyqz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d2luemZob2t1Z3Z0cG12eXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MzIyNjcsImV4cCI6MjA4MTQwODI2N30.xbNWsxmQ4MwbjaQgzfZLkvLE66XqaANiUD4pggr43Vg';
+
+        let client = null;
+        let messageCount = 0;
+        let connectTime = null;
+        let timerInterval = null;
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString('es-PE');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStats() {
+            document.getElementById('msgCount').textContent = messageCount;
+            
+            if (connectTime) {
+                const elapsed = Math.floor((Date.now() - connectTime) / 1000);
+                document.getElementById('timeConnected').textContent = `${elapsed}s`;
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            log('Logs limpiados', 'info');
+        }
+
+        function testConnection() {
+            log('🔄 Iniciando test de conexión MQTT...', 'warning');
+            
+            // Detectar ambiente
+            const isHTTPS = window.location.protocol === 'https:';
+            const isLocal = window.location.protocol === 'file:';
+            
+            log(`📍 Protocolo: <code>${window.location.protocol}</code>`, 'info');
+            log(`📍 Host: <code>${window.location.host || 'local'}</code>`, 'info');
+            log(`📍 User Agent: <code>${navigator.userAgent.split(' ').slice(0, 3).join(' ')}</code>`, 'info');
+            
+            if (!isHTTPS && !isLocal) {
+                log('⚠️ ADVERTENCIA: No estás en HTTPS. WebSocket puede fallar.', 'warning');
+            }
+
+            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
+            log(`🔗 Conectando a: <code>${url}</code>`, 'info');
+
+            // Intentar cerrar conexión anterior
+            if (client) {
+                log('🔌 Cerrando conexión anterior...', 'warning');
+                client.end(true);
+                client = null;
+            }
+
+            const clientId = 'Debug_' + Math.random().toString(16).substr(2, 8);
+            log(`🆔 Client ID: <code>${clientId}</code>`, 'info');
+
+            try {
+                client = mqtt.connect(url, {
+                    username: MQTT_CONFIG.user,
+                    password: MQTT_CONFIG.pass,
+                    clientId: clientId,
+                    reconnectPeriod: 5000,
+                    connectTimeout: 10000,
+                    keepalive: 60
+                });
+
+                client.on('connect', () => {
+                    log('✅ <strong>MQTT CONECTADO EXITOSAMENTE!</strong>', 'success');
+                    document.getElementById('statusMQTT').textContent = '🟢';
+                    connectTime = Date.now();
+                    messageCount = 0;
+                    
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerInterval = setInterval(updateStats, 1000);
+                    
+                    log('📡 Suscribiéndose a topics...', 'info');
+                    
+                    const topics = [
+                        'esp32/sensores',
+                        'esp32/status',
+                        'esp32/relay/status',
+                        'esp32/config'
+                    ];
+                    
+                    topics.forEach(topic => {
+                        client.subscribe(topic, (err) => {
+                            if (err) {
+                                log(`❌ Error suscribiéndose a <code>${topic}</code>: ${err.message}`, 'error');
+                            } else {
+                                log(`✅ Suscrito a <code>${topic}</code>`, 'success');
+                            }
+                        });
+                    });
+                    
+                    log('⏳ Esperando mensajes del ESP32...', 'info');
+                });
+
+                client.on('message', (topic, message) => {
+                    messageCount++;
+                    updateStats();
+                    
+                    const msg = message.toString();
+                    log(`📩 <strong>Mensaje recibido</strong> en <code>${topic}</code>`, 'success');
+                    
+                    try {
+                        const parsed = JSON.parse(msg);
+                        log(`📦 Datos: <code>${JSON.stringify(parsed).substring(0, 100)}</code>`, 'info');
+                    } catch {
+                        log(`📦 Datos (texto): <code>${msg.substring(0, 100)}</code>`, 'info');
+                    }
+                });
+
+                client.on('error', (error) => {
+                    log(`❌ <strong>ERROR MQTT:</strong> ${error.message}`, 'error');
+                    document.getElementById('statusMQTT').textContent = '🔴';
+                    
+                    // Diagnóstico específico
+                    if (error.message.includes('ENOTFOUND')) {
+                        log('💡 El host MQTT no se puede resolver. Verifica la URL.', 'error');
+                    } else if (error.message.includes('ETIMEDOUT')) {
+                        log('💡 Timeout de conexión. Verifica el puerto y firewall.', 'error');
+                    } else if (error.message.includes('WebSocket')) {
+                        log('💡 Error de WebSocket. Verifica que el puerto 8884 esté abierto para WSS.', 'error');
+                    }
+                });
+
+                client.on('offline', () => {
+                    log('⚠️ Cliente MQTT desconectado (offline)', 'warning');
+                    document.getElementById('statusMQTT').textContent = '🟡';
+                });
+
+                client.on('close', () => {
+                    log('🔌 Conexión MQTT cerrada', 'warning');
+                    document.getElementById('statusMQTT').textContent = '🔴';
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                });
+
+                client.on('reconnect', () => {
+                    log('🔄 Intentando reconectar...', 'warning');
+                });
+
+            } catch (error) {
+                log(`❌ <strong>EXCEPCIÓN:</strong> ${error.message}`, 'error');
+                log(`📋 Stack: <code>${error.stack}</code>`, 'error');
+            }
+        }
+
+        async function testSupabase() {
+            log('🔄 Testeando conexión a Supabase...', 'warning');
+            
+            try {
+                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                log('📡 Consultando últimas lecturas...', 'info');
+                
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (error) {
+                    log(`❌ Error Supabase: ${error.message}`, 'error');
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    log(`✅ <strong>Supabase conectado! ${data.length} lecturas encontradas</strong>`, 'success');
+                    data.forEach((item, idx) => {
+                        log(`📊 Lectura ${idx + 1}: Temp ${item.temperatura}°C, Hum ${item.humedad}% - ${new Date(item.created_at).toLocaleString('es-PE')}`, 'info');
+                    });
+                } else {
+                    log('⚠️ Supabase conectado pero sin datos', 'warning');
+                }
+
+            } catch (error) {
+                log(`❌ Excepción Supabase: ${error.message}`, 'error');
+            }
+        }
+
+        // Test automático al cargar
+        window.addEventListener('load', () => {
+            log('🌐 Página cargada. Ambiente detectado.', 'info');
+            log('💡 Click en "Test Conexión MQTT" para iniciar diagnóstico', 'warning');
+        });
+    </script>
+</body>
+</html>
