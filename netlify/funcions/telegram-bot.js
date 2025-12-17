@@ -1,6 +1,6 @@
 // 🤖 BOT DE TELEGRAM PARA NETLIFY FUNCTIONS
 // Adaptado de Python a JavaScript con máxima funcionalidad
-
+// version ,e
 const mqtt = require('mqtt');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
