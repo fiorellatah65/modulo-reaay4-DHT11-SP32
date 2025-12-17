@@ -1,3 +1,6 @@
-# Local Netlify folder
-# proyecto/.gitignore
-.netlify
+node_modules/
+.netlify/
+.env
+*.log
+.DS_Store
+package-lock.json

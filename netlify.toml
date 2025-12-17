@@ -16,7 +16,7 @@
 # Redirigir raíz a debug-mqtt.html
 [[redirects]]
   from = "/"
-  to = "/aqui.html"
+  to = "/index.html"
   status = 200
   force = true
 
