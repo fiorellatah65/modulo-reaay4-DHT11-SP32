@@ -1,14 +1,22 @@
 [build]
-  command = "echo 'Build complete'"
+  # No build command needed
   publish = "."
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
 
+# Headers de seguridad
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Redirect para SPA (opcional)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
