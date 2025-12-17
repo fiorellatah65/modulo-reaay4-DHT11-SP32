@@ -1,0 +1,19 @@
+{
+  "name": "esp32-control-netlify",
+  "version": "1.0.0",
+  "description": "Sistema ESP32 con control por voz y dashboard web",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Build complete'",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.4",
+    "node-fetch": "^2.7.0",
+    "node-gtts": "^2.0.2",
+    "form-data": "^4.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}

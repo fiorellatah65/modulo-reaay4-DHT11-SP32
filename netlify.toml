@@ -1,0 +1,14 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[functions]
+  node_bundler = "esbuild"
+
+# Variables de entorno (configurar en Netlify UI)
+# TELEGRAM_TOKEN = "8491255978:AAFfDy6smKSAhkcGjtX8HxHh6cXe9RB4Y44"
