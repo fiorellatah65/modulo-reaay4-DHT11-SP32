@@ -20,9 +20,3 @@
   status = 200
   force = true
 
-# SPA fallback para otras rutas
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
