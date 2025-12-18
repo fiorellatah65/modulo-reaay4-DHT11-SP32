@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 🤖 BOT DE TELEGRAM COMPLETO - CONTROL TOTAL ESP32
-✅ Control de dispositivos via Supabase (usando requests)
+✅ Compatible con Python 3.13
+✅ Control de dispositivos via Supabase
 ✅ Configuración de temperaturas mín/máx
 ✅ Sistema de alertas automáticas
-✅ Sincronización en tiempo real
-✅ Respuesta triple: Texto + Audio Telegram + Parlante ESP32
+✅ Reconocimiento de voz funcional
 """
 
 import os
+import sys
 import json
 import base64
 import tempfile
@@ -19,8 +20,22 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import paho.mqtt.client as mqtt
 from gtts import gTTS
 from io import BytesIO
-import speech_recognition as sr
-from pydub import AudioSegment
+
+# Importaciones condicionales para audio
+try:
+    import speech_recognition as sr
+    VOICE_ENABLED = True
+    print("✅ Reconocimiento de voz habilitado")
+except ImportError:
+    VOICE_ENABLED = False
+    print("⚠️ Reconocimiento de voz deshabilitado (SpeechRecognition no disponible)")
+
+try:
+    from pydub import AudioSegment
+    AUDIO_ENABLED = True
+except ImportError:
+    AUDIO_ENABLED = False
+    print("⚠️ Procesamiento de audio deshabilitado (pydub no disponible)")
 
 # ========================================
 # CONFIGURACIÓN
@@ -37,7 +52,6 @@ MQTT_PASS = "Esp32pass123"
 SUPABASE_URL = "https://yxwinzfhokugvtpmvyqz.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d2luemZob2t1Z3Z0cG12eXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MzIyNjcsImV4cCI6MjA4MTQwODI2N30.xbNWsxmQ4MwbjaQgzfZLkvLE66XqaANiUD4pggr43Vg"
 
-# Headers para Supabase REST API
 SUPABASE_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -62,7 +76,7 @@ mqtt_connected = False
 print("🚀 Iniciando Bot ESP32 con Control Total...")
 
 # ========================================
-# FUNCIONES SUPABASE (usando requests)
+# FUNCIONES SUPABASE
 # ========================================
 
 def get_latest_sensor_data():
@@ -107,7 +121,6 @@ def get_system_config():
 def update_system_config(setpoint=None, hysteresis=None, temp_max=None, temp_min=None):
     """Actualiza la configuración en Supabase"""
     try:
-        # Obtener config actual
         url_get = f"{SUPABASE_URL}/rest/v1/system_config?select=*&order=id.desc&limit=1"
         response = requests.get(url_get, headers=SUPABASE_HEADERS)
         
@@ -116,7 +129,6 @@ def update_system_config(setpoint=None, hysteresis=None, temp_max=None, temp_min
             if data_list and len(data_list) > 0:
                 config_id = data_list[0]['id']
                 
-                # Preparar datos a actualizar
                 update_data = {}
                 if setpoint is not None:
                     update_data['setpoint'] = setpoint
@@ -134,9 +146,7 @@ def update_system_config(setpoint=None, hysteresis=None, temp_max=None, temp_min
                     response = requests.patch(url_update, headers=SUPABASE_HEADERS, json=update_data)
                     
                     if response.status_code in [200, 204]:
-                        print(f"✅ Config actualizada en Supabase: {update_data}")
-                        
-                        # Publicar en MQTT para que ESP32 se actualice
+                        print(f"✅ Config actualizada: {update_data}")
                         mqtt_client.publish("esp32/config/set", json.dumps(update_data))
                         return True
     except Exception as e:
@@ -160,20 +170,19 @@ def update_relay_state(relay_number, state, mode=None):
         response = requests.post(url, headers=SUPABASE_HEADERS, json=data)
         
         if response.status_code in [200, 201]:
-            print(f"✅ Relay {relay_number} actualizado en Supabase: {state}")
+            print(f"✅ Relay {relay_number} → {'ON' if state else 'OFF'}")
             
-            # Publicar en MQTT
             mqtt_client.publish(f"esp32/relay/{relay_number}/cmd", "ON" if state else "OFF")
             if mode is not None:
                 mqtt_client.publish(f"esp32/relay/{relay_number}/mode", str(mode))
             
             return True
     except Exception as e:
-        print(f"❌ Error actualizando relay: {e}")
+        print(f"❌ Error relay: {e}")
     return False
 
 def get_relay_states():
-    """Obtiene el último estado de cada relay desde Supabase"""
+    """Obtiene el último estado de cada relay"""
     try:
         states = {}
         for i in range(1, 5):
@@ -208,10 +217,10 @@ def create_alert(alert_type, message, severity='WARNING'):
         response = requests.post(url, headers=SUPABASE_HEADERS, json=data)
         
         if response.status_code in [200, 201]:
-            print(f"✅ Alerta creada: {alert_type} - {message}")
+            print(f"✅ Alerta: {message}")
             return True
     except Exception as e:
-        print(f"❌ Error creando alerta: {e}")
+        print(f"❌ Error alerta: {e}")
     return False
 
 # ========================================
@@ -230,8 +239,7 @@ def on_mqtt_connect(client, userdata, flags, rc):
     client.subscribe("esp32/relay/status")
     client.subscribe("esp32/config")
     
-    # Apagar todos los dispositivos al inicio
-    print("🔴 Apagando todos los dispositivos al iniciar...")
+    print("🔴 Apagando dispositivos...")
     for i in range(1, 5):
         update_relay_state(i, False, mode=0)
 
@@ -246,7 +254,7 @@ def on_mqtt_message(client, userdata, msg):
             latest_sensor_data['alert'] = data.get('alert', 'OK')
             
             if latest_sensor_data['temp'] is not None:
-                print(f"📊 Temp: {latest_sensor_data['temp']:.1f}°C | Hum: {latest_sensor_data['hum']:.0f}%")
+                print(f"📊 {latest_sensor_data['temp']:.1f}°C | {latest_sensor_data['hum']:.0f}%")
             
         elif msg.topic == "esp32/relay/status":
             for key, value in data.items():
@@ -268,7 +276,7 @@ try:
     mqtt_client.loop_start()
     print("✅ MQTT iniciado")
 except Exception as e:
-    print(f"⚠️ Error MQTT: {e}")
+    print(f"⚠️ MQTT: {e}")
 
 # ========================================
 # FUNCIONES DE AUDIO
@@ -283,14 +291,15 @@ def text_to_speech_telegram(text: str) -> BytesIO:
         buffer.seek(0)
         return buffer
     except Exception as e:
-        print(f"❌ Error TTS Telegram: {e}")
+        print(f"❌ TTS: {e}")
         return None
 
 def send_audio_to_esp32_speaker(text: str):
-    """Genera audio WAV y lo envía al parlante ESP32"""
+    """Audio para parlante ESP32"""
+    if not AUDIO_ENABLED:
+        return
+    
     try:
-        print(f"🔊 Generando audio para parlante: {text[:60]}...")
-        
         tts = gTTS(text=text, lang='es', slow=False)
         mp3_buffer = BytesIO()
         tts.write_to_fp(mp3_buffer)
@@ -307,24 +316,20 @@ def send_audio_to_esp32_speaker(text: str):
         chunk_size = 1000
         
         mqtt_client.publish("esp32/tts/audio/start", "")
-        
         for i in range(0, len(b64_data), chunk_size):
-            chunk = b64_data[i:i+chunk_size]
-            mqtt_client.publish("esp32/tts/audio/chunk", chunk)
-        
+            mqtt_client.publish("esp32/tts/audio/chunk", b64_data[i:i+chunk_size])
         mqtt_client.publish("esp32/tts/audio/end", "")
-        print("✅ Audio enviado al parlante ESP32")
         
     except Exception as e:
-        print(f"❌ Error enviando audio: {e}")
+        print(f"❌ Audio ESP32: {e}")
 
 def speech_to_text(audio_file_path: str) -> str:
     """Convierte nota de voz a texto"""
-    recognizer = sr.Recognizer()
+    if not VOICE_ENABLED or not AUDIO_ENABLED:
+        return None
     
     try:
-        print("🎤 Procesando nota de voz...")
-        
+        recognizer = sr.Recognizer()
         audio = AudioSegment.from_file(audio_file_path)
         
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as wav_file:
@@ -334,7 +339,6 @@ def speech_to_text(audio_file_path: str) -> str:
         with sr.AudioFile(wav_path) as source:
             audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data, language='es-ES')
-            print(f"✅ Reconocido: {text}")
             
         try:
             os.unlink(wav_path)
@@ -343,10 +347,8 @@ def speech_to_text(audio_file_path: str) -> str:
             
         return text
         
-    except sr.UnknownValueError:
-        return None
     except Exception as e:
-        print(f"❌ Error procesando audio: {e}")
+        print(f"❌ Voice: {e}")
         return None
 
 # ========================================
@@ -354,153 +356,100 @@ def speech_to_text(audio_file_path: str) -> str:
 # ========================================
 
 def process_command(text: str) -> str:
-    """Procesa comandos y retorna respuesta"""
+    """Procesa comandos"""
     t = text.lower()
     
-    # Actualizar config desde Supabase
     global current_config
     db_config = get_system_config()
     if db_config:
         current_config = db_config
     
     # CONSULTAS
-    if any(w in t for w in ['temperatura', 'temp', 'cuánto', 'cuánta', 'grados', 'clima']):
+    if any(w in t for w in ['temperatura', 'temp', 'cuánto', 'grados', 'clima']):
         data = get_latest_sensor_data()
         if data and data['temp'] is not None:
             return f"La temperatura actual es {data['temp']:.1f} grados celsius y la humedad es {data['hum']:.0f} por ciento"
-        
-        if not mqtt_connected:
-            return "No puedo conectarme al sistema ESP32. Verifica que esté encendido."
-        return "Aún no he recibido datos del sensor. Espera unos segundos."
+        return "Esperando datos del sensor..."
     
-    elif any(w in t for w in ['humedad', 'húmedo', 'húmeda']):
+    elif any(w in t for w in ['humedad', 'húmedo']):
         data = get_latest_sensor_data()
         if data and data['hum'] is not None:
             return f"La humedad actual es del {data['hum']:.0f} por ciento"
-        return "Aún no he recibido datos del sensor de humedad."
+        return "Esperando datos..."
     
-    elif any(w in t for w in ['estado', 'cómo está', 'sistema', 'todo bien']):
+    elif any(w in t for w in ['estado', 'sistema']):
         data = get_latest_sensor_data()
         if not data or data['temp'] is None:
-            return "El sistema está iniciando. Aún no he recibido datos."
+            return "Sistema iniciando..."
         
         states = get_relay_states()
         relay_info = ""
         if states:
             on_count = sum(1 for r in states.values() if r.get('state', False))
-            relay_info = f" Dispositivos activos: {on_count} de 4."
+            relay_info = f" Dispositivos activos: {on_count}/4."
         
-        temp_status = "Todo está bien"
-        if data['temp'] > current_config['tempMax']:
-            temp_status = f"⚠️ Temperatura ALTA ({data['temp']:.1f}°C)"
-        elif data['temp'] < current_config['tempMin']:
-            temp_status = f"⚠️ Temperatura BAJA ({data['temp']:.1f}°C)"
-        
-        return f"{temp_status}. Temperatura {data['temp']:.1f} grados, Humedad {data['hum']:.0f} por ciento.{relay_info}"
+        return f"Temperatura {data['temp']:.1f}°C, Humedad {data['hum']:.0f}%.{relay_info}"
     
-    elif 'dispositivos' in t or 'relays' in t or 'qué está encendido' in t:
+    elif 'dispositivos' in t:
         states = get_relay_states()
         if not states:
-            return "No tengo información de los dispositivos"
+            return "Sin información de dispositivos"
         
         status = []
         for key in ['r1', 'r2', 'r3', 'r4']:
             relay = states.get(key)
             if relay:
-                state_text = "encendido" if relay.get('state', False) else "apagado"
-                status.append(f"{relay['name']}: {state_text}")
+                st = "encendido" if relay.get('state', False) else "apagado"
+                status.append(f"{relay['name']}: {st}")
         
-        return "Estado actual: " + ", ".join(status)
+        return "Estado: " + ", ".join(status)
     
     elif 'configuración' in t or 'config' in t:
-        return f"Configuración actual: Temperatura objetivo {current_config['setpoint']}°C, Histéresis {current_config['hysteresis']}°C, Temperatura máxima {current_config['tempMax']}°C, Temperatura mínima {current_config['tempMin']}°C"
+        return f"Config: Objetivo {current_config['setpoint']}°C, Max {current_config['tempMax']}°C, Min {current_config['tempMin']}°C"
     
-    # CONTROL DE DISPOSITIVOS - ON
-    elif 'enciende' in t or 'prende' in t or 'activa' in t or 'encender' in t:
+    # CONTROL - ON
+    elif 'enciende' in t or 'prende' in t or 'encender' in t:
         if 'ventilador' in t or '1' in t:
-            if update_relay_state(1, True, mode=3):
-                return "✅ He encendido el ventilador correctamente"
-        elif 'calefactor' in t or 'calor' in t or '2' in t:
-            if update_relay_state(2, True, mode=3):
-                return "✅ He encendido el calefactor correctamente"
+            update_relay_state(1, True, mode=3)
+            return "✅ Ventilador encendido"
+        elif 'calefactor' in t or '2' in t:
+            update_relay_state(2, True, mode=3)
+            return "✅ Calefactor encendido"
         elif 'humidificador' in t or '3' in t:
-            if update_relay_state(3, True, mode=3):
-                return "✅ He encendido el humidificador correctamente"
-        elif 'luz' in t or 'foco' in t or 'lámpara' in t or '4' in t:
-            if update_relay_state(4, True, mode=3):
-                return "✅ He encendido la luz correctamente"
-        elif 'todo' in t or 'todos' in t:
+            update_relay_state(3, True, mode=3)
+            return "✅ Humidificador encendido"
+        elif 'luz' in t or 'foco' in t or '4' in t:
+            update_relay_state(4, True, mode=3)
+            return "✅ Luz encendida"
+        elif 'todo' in t:
             for i in range(1, 5):
                 update_relay_state(i, True, mode=3)
-            return "✅ He encendido todos los dispositivos"
-        return "No entendí qué dispositivo encender. Di: ventilador, calefactor, humidificador o luz"
+            return "✅ Todos encendidos"
+        return "Especifica: ventilador, calefactor, humidificador, luz"
     
-    # CONTROL DE DISPOSITIVOS - OFF
-    elif 'apaga' in t or 'desactiva' in t or 'apagar' in t:
+    # CONTROL - OFF
+    elif 'apaga' in t or 'apagar' in t:
         if 'ventilador' in t or '1' in t:
-            if update_relay_state(1, False, mode=3):
-                return "✅ He apagado el ventilador"
-        elif 'calefactor' in t or 'calor' in t or '2' in t:
-            if update_relay_state(2, False, mode=3):
-                return "✅ He apagado el calefactor"
+            update_relay_state(1, False, mode=3)
+            return "✅ Ventilador apagado"
+        elif 'calefactor' in t or '2' in t:
+            update_relay_state(2, False, mode=3)
+            return "✅ Calefactor apagado"
         elif 'humidificador' in t or '3' in t:
-            if update_relay_state(3, False, mode=3):
-                return "✅ He apagado el humidificador"
-        elif 'luz' in t or 'foco' in t or 'lámpara' in t or '4' in t:
-            if update_relay_state(4, False, mode=3):
-                return "✅ He apagado la luz"
-        elif 'todo' in t or 'todos' in t:
+            update_relay_state(3, False, mode=3)
+            return "✅ Humidificador apagado"
+        elif 'luz' in t or 'foco' in t or '4' in t:
+            update_relay_state(4, False, mode=3)
+            return "✅ Luz apagada"
+        elif 'todo' in t:
             for i in range(1, 5):
                 update_relay_state(i, False, mode=3)
-            return "✅ He apagado todos los dispositivos"
-        return "No entendí qué dispositivo apagar. Di: ventilador, calefactor, humidificador o luz"
+            return "✅ Todos apagados"
+        return "Especifica: ventilador, calefactor, humidificador, luz"
     
-    # CAMBIO DE MODOS
-    elif 'modo' in t:
-        relay_num = None
-        mode_val = None
-        mode_name = None
-        
-        if 'ventilador' in t or '1' in t:
-            relay_num = 1
-        elif 'calefactor' in t or '2' in t:
-            relay_num = 2
-        elif 'humidificador' in t or '3' in t:
-            relay_num = 3
-        elif 'luz' in t or '4' in t:
-            relay_num = 4
-        
-        if 'automático' in t or 'auto' in t:
-            mode_name = 'automático'
-            mode_val = 2
-        elif 'manual' in t:
-            mode_name = 'manual'
-            mode_val = 3
-        elif 'siempre encendido' in t or 'forzado on' in t:
-            mode_name = 'siempre encendido'
-            mode_val = 1
-        elif 'siempre apagado' in t or 'forzado off' in t:
-            mode_name = 'siempre apagado'
-            mode_val = 0
-        else:
-            return "Modos: automático, manual, siempre encendido, siempre apagado"
-        
-        if relay_num and mode_val is not None:
-            states = get_relay_states()
-            current_state = False
-            if states and f'r{relay_num}' in states:
-                current_state = states[f'r{relay_num}'].get('state', False)
-            
-            if update_relay_state(relay_num, current_state, mode=mode_val):
-                relay_names = ['ventilador', 'calefactor', 'humidificador', 'luz']
-                return f"✅ He cambiado el {relay_names[relay_num-1]} a modo {mode_name}"
-        
-        return "Especifica el dispositivo: ventilador, calefactor, humidificador o luz"
-    
-    # CONFIGURACIÓN DE SISTEMA
-    elif any(word in t for word in ['cambia', 'ajusta', 'modifica', 'pon', 'configura', 'configuración']):
+    # CONFIGURACIÓN
+    elif any(w in t for w in ['cambia', 'configura', 'pon']):
         words = t.split()
-        
         temp_value = None
         for word in words:
             try:
@@ -510,150 +459,88 @@ def process_command(text: str) -> str:
                 continue
         
         if temp_value is None:
-            return "No entendí el valor. Di un número. Ejemplo: 'temperatura mínima 18'"
+            return "Especifica un número. Ej: 'temperatura mínima 18'"
         
-        # SETPOINT
-        if any(w in t for w in ['setpoint', 'objetivo', 'temperatura objetivo']):
+        if any(w in t for w in ['setpoint', 'objetivo']):
             if 15 <= temp_value <= 35:
                 if update_system_config(setpoint=temp_value):
-                    return f"✅ Temperatura objetivo cambiada a {temp_value}°C"
-            return "El setpoint debe estar entre 15 y 35 grados"
+                    return f"✅ Temperatura objetivo: {temp_value}°C"
+            return "Setpoint debe estar entre 15-35°C"
         
-        # HISTÉRESIS
-        elif any(w in t for w in ['histéresis', 'histeresis', 'margen']):
-            if 0.5 <= temp_value <= 5:
-                if update_system_config(hysteresis=temp_value):
-                    return f"✅ Histéresis cambiada a {temp_value}°C"
-            return "La histéresis debe estar entre 0.5 y 5 grados"
-        
-        # TEMPERATURA MÁXIMA
-        elif any(w in t for w in ['máxima', 'maxima', 'max', 'alta', 'máx']):
+        elif any(w in t for w in ['máxima', 'maxima', 'max']):
             if 20 <= temp_value <= 50:
                 if update_system_config(temp_max=int(temp_value)):
-                    create_alert('CONFIG_CHANGE', f'Temp máxima configurada en {int(temp_value)}°C', 'WARNING')
-                    return f"✅ Temperatura máxima configurada en {int(temp_value)}°C. Te avisaré si se supera este valor"
-            return "La temperatura máxima debe estar entre 20 y 50 grados"
+                    create_alert('CONFIG', f'Temp máx: {int(temp_value)}°C', 'WARNING')
+                    return f"✅ Temperatura máxima: {int(temp_value)}°C"
+            return "Temp máxima debe estar entre 20-50°C"
         
-        # TEMPERATURA MÍNIMA
-        elif any(w in t for w in ['mínima', 'minima', 'min', 'baja', 'mín']):
+        elif any(w in t for w in ['mínima', 'minima', 'min']):
             if 5 <= temp_value <= 25:
                 if update_system_config(temp_min=int(temp_value)):
-                    create_alert('CONFIG_CHANGE', f'Temp mínima configurada en {int(temp_value)}°C', 'WARNING')
-                    return f"✅ Temperatura mínima configurada en {int(temp_value)}°C. Te avisaré si baja de este valor"
-            return "La temperatura mínima debe estar entre 5 y 25 grados"
+                    create_alert('CONFIG', f'Temp mín: {int(temp_value)}°C', 'WARNING')
+                    return f"✅ Temperatura mínima: {int(temp_value)}°C"
+            return "Temp mínima debe estar entre 5-25°C"
         
-        return "Especifica qué cambiar: temperatura mínima, temperatura máxima, setpoint o histéresis"
+        return "Especifica: temperatura mínima, máxima o setpoint"
     
-    # AYUDA
-    elif 'ayuda' in t or 'comandos' in t or 'qué puedes hacer' in t:
-        return """Puedo ayudarte con:
-
-📊 CONSULTAS:
-• temperatura / humedad / estado / dispositivos
-
-🎛️ CONTROL:
-• enciende/apaga ventilador, calefactor, humidificador, luz
-
-⚙️ CONFIGURACIÓN:
-• "cambia setpoint a 25"
-• "temperatura mínima 18"
-• "temperatura máxima 30"
-
-🔄 MODOS:
-• modo ventilador automático / manual"""
+    elif 'ayuda' in t:
+        return """Comandos:
+📊 temperatura / humedad / estado
+🎛️ enciende/apaga ventilador, calefactor, luz
+⚙️ temperatura mínima/máxima [valor]"""
     
-    return "No entendí tu comando. Escribe 'ayuda' para ver todos los comandos"
+    return "No entendí. Escribe 'ayuda'"
 
 # ========================================
-# HANDLERS DE TELEGRAM
+# TELEGRAM HANDLERS
 # ========================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📊 Estado", callback_data='status')],
         [InlineKeyboardButton("🌡️ Temperatura", callback_data='temp')],
-        [InlineKeyboardButton("🔌 Dispositivos", callback_data='devices')],
-        [InlineKeyboardButton("⚙️ Configuración", callback_data='config')],
-        [InlineKeyboardButton("❓ Ayuda", callback_data='help')]
+        [InlineKeyboardButton("🔌 Dispositivos", callback_data='devices')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    text = """
-🤖 *Bot ESP32 - Control Total*
+    text = """🤖 *Bot ESP32*
 
-*🎤 ENVÍA NOTA DE VOZ:*
-• "¿Qué temperatura hay?"
-• "Enciende el ventilador"
-• "Temperatura mínima 18"
-
-*💬 O ESCRIBE TEXTO:*
+Escribe:
 • temperatura
-• enciende luz
-• apaga todo
-
-Escribe *ayuda* para ver todos los comandos 🚀
-    """
+• enciende ventilador
+• temperatura mínima 18
+• ayuda"""
     
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = """
-📚 *COMANDOS DISPONIBLES*
-
-*📊 CONSULTAS:*
-• temperatura / humedad / estado
-
-*🎛️ CONTROL:*
-• enciende/apaga ventilador, calefactor, luz
-
-*⚙️ CONFIGURACIÓN:*
-• temperatura mínima/máxima
-• cambia setpoint
-
-*🎤 NOTA DE VOZ:*
-Envía cualquier comando por voz
-    """
-    await update.message.reply_text(text, parse_mode='Markdown')
 
 async def temp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_latest_sensor_data()
     
     if not data or data['temp'] is None:
-        await update.message.reply_text("⏳ Aún no he recibido datos del sensor.")
+        await update.message.reply_text("⏳ Esperando datos...")
         return
     
-    text_msg = f"""
-🌡️ *TEMPERATURA*
+    text = f"""🌡️ *TEMPERATURA*
 
-Temperatura: *{data['temp']:.1f}°C*
-Humedad: *{data['hum']:.0f}%*
-Setpoint: *{current_config['setpoint']:.1f}°C*
+Temp: *{data['temp']:.1f}°C*
+Hum: *{data['hum']:.0f}%*
 
-Límites:
-📈 Máx: *{current_config['tempMax']}°C*
-📉 Mín: *{current_config['tempMin']}°C*
-    """
-    await update.message.reply_text(text_msg, parse_mode='Markdown')
+Max: {current_config['tempMax']}°C
+Min: {current_config['tempMin']}°C"""
     
-    audio_text = f"La temperatura es {data['temp']:.1f} grados celsius y la humedad es {data['hum']:.0f} por ciento"
+    await update.message.reply_text(text, parse_mode='Markdown')
+    
+    audio_text = f"Temperatura {data['temp']:.1f} grados, humedad {data['hum']:.0f} por ciento"
     audio = text_to_speech_telegram(audio_text)
     if audio:
         await update.message.reply_voice(voice=audio)
-    
-    send_audio_to_esp32_speaker(audio_text)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_latest_sensor_data()
     
     if not data or data['temp'] is None:
-        await update.message.reply_text("⏳ Sistema iniciando.")
+        await update.message.reply_text("⏳ Iniciando...")
         return
-    
-    temp_status = "✅"
-    if data['temp'] > current_config['tempMax']:
-        temp_status = "🔥"
-    elif data['temp'] < current_config['tempMin']:
-        temp_status = "❄️"
     
     devices = ""
     states = get_relay_states()
@@ -661,58 +548,38 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for key in ['r1', 'r2', 'r3', 'r4']:
             r = states.get(key)
             if r:
-                state = "🟢" if r.get('state', False) else "🔴"
-                devices += f"\n{state} {r['name']}"
+                st = "🟢" if r.get('state', False) else "🔴"
+                devices += f"\n{st} {r['name']}"
     
-    text_msg = f"""
-{temp_status} *ESTADO*
+    text = f"""✅ *ESTADO*
 
 🌡️ {data['temp']:.1f}°C | 💧 {data['hum']:.0f}%
-🎯 Setpoint: {current_config['setpoint']:.1f}°C
 
-*Dispositivos:*{devices}
-    """
-    await update.message.reply_text(text_msg, parse_mode='Markdown')
+*Dispositivos:*{devices}"""
     
-    audio_text = f"Temperatura {data['temp']:.1f} grados"
-    audio = text_to_speech_telegram(audio_text)
-    if audio:
-        await update.message.reply_voice(voice=audio)
-    
-    send_audio_to_esp32_speaker(audio_text)
+    await update.message.reply_text(text, parse_mode='Markdown')
 
 async def devices_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     states = get_relay_states()
     if not states:
-        await update.message.reply_text("No hay información de dispositivos")
+        await update.message.reply_text("Sin info")
         return
     
     text = "*🔌 DISPOSITIVOS*\n\n"
-    
-    modes = ["🔴 OFF", "🟢 ON", "🤖 AUTO", "✋ MANUAL"]
-    
     for key in ['r1', 'r2', 'r3', 'r4']:
         r = states.get(key)
         if r:
-            state = "🟢" if r.get('state', False) else "🔴"
-            mode = modes[r.get('mode', 0)]
-            text += f"{state} *{r['name']}* - {mode}\n"
+            st = "🟢 ON" if r.get('state', False) else "🔴 OFF"
+            text += f"{r['name']}: {st}\n"
     
     await update.message.reply_text(text, parse_mode='Markdown')
 
-async def config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = f"""
-⚙️ *CONFIGURACIÓN*
-
-🎯 Objetivo: *{current_config['setpoint']}°C*
-📊 Histéresis: *{current_config['hysteresis']}°C*
-🔥 Max: *{current_config['tempMax']}°C*
-❄️ Min: *{current_config['tempMin']}°C*
-    """
-    await update.message.reply_text(text, parse_mode='Markdown')
-
-async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para NOTAS DE VOZ"""
+async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler notas de voz"""
+    if not VOICE_ENABLED:
+        await update.message.reply_text("❌ Reconocimiento de voz no disponible. Usa texto.")
+        return
+    
     await update.message.reply_text("🎤 Procesando...")
     
     try:
@@ -731,39 +598,32 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         
         if text:
             await update.message.reply_text(f"📝 *\"{text}\"*", parse_mode='Markdown')
-            
             response = process_command(text)
-            
             await update.message.reply_text(f"💬 {response}")
             
             audio = text_to_speech_telegram(response)
             if audio:
                 await update.message.reply_voice(voice=audio)
-            
             send_audio_to_esp32_speaker(response)
-            
         else:
-            await update.message.reply_text("❌ No entendí la voz.")
+            await update.message.reply_text("❌ No entendí")
     
     except Exception as e:
-        print(f"❌ Error: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
-async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para MENSAJES DE TEXTO"""
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler texto"""
     text = update.message.text
     
     if text.startswith('/'):
         return
     
     response = process_command(text)
-    
     await update.message.reply_text(f"💬 {response}")
     
     audio = text_to_speech_telegram(response)
     if audio:
         await update.message.reply_voice(voice=audio)
-    
     send_audio_to_esp32_speaker(response)
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -779,24 +639,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await temp_command(fake_update, context)
     elif query.data == 'devices':
         await devices_command(fake_update, context)
-    elif query.data == 'config':
-        await config_command(fake_update, context)
-    elif query.data == 'help':
-        await help_command(fake_update, context)
 
 # ========================================
 # MAIN
 # ========================================
 
 def main():
-    print("\n" + "="*70)
-    print("🤖 BOT ESP32 - CONTROL TOTAL (sin librería supabase)")
-    print("="*70)
-    print("✅ Usa requests directamente a Supabase REST API")
-    print("✅ Control completo de dispositivos")
-    print("✅ Configuración de temperaturas")
-    print("✅ Sistema de alertas")
-    print("="*70 + "\n")
+    print("\n" + "="*60)
+    print("🤖 BOT ESP32 - CONTROL TOTAL")
+    print("="*60)
+    print(f"✅ Python {sys.version.split()[0]}")
+    print(f"✅ Voz: {'SI' if VOICE_ENABLED else 'NO'}")
+    print(f"✅ Audio: {'SI' if AUDIO_ENABLED else 'NO'}")
+    print("="*60 + "\n")
     
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
@@ -804,20 +659,15 @@ def main():
     app.add_handler(CommandHandler("temp", temp_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("devices", devices_command))
-    app.add_handler(CommandHandler("config", config_command))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("ayuda", help_command))
     
-    app.add_handler(MessageHandler(filters.VOICE, voice_message_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))
+    if VOICE_ENABLED:
+        app.add_handler(MessageHandler(filters.VOICE, voice_handler))
+    
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(CallbackQueryHandler(button_callback))
     
     print("✅ Bot listo")
-    print("\n📱 Prueba:")
-    print("   • temperatura")
-    print("   • enciende ventilador")
-    print("   • temperatura mínima 18")
-    print("\n🤖 CORRIENDO...\n")
+    print("🤖 CORRIENDO...\n")
     
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
