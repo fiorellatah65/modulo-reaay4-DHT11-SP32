@@ -1,5 +1,6 @@
-python-telegram-bot==20.8
+python-telegram-bot==20.7
 paho-mqtt==1.6.1
-gtts==2.5.1
-SpeechRecognition==3.10.4
+gtts==2.5.0
+SpeechRecognition==3.10.1
 pydub==0.25.1
+requests==2.31.0
