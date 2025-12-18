@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Control + Historial</title>
+    <title>🤖 ESP32 Dashboard - Monitoreo en Tiempo Real</title>
     <style>
         :root {
             --primary: #667eea;
@@ -93,7 +93,7 @@
 
         .dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 15px;
             max-width: 1600px;
             margin: 0 auto;
@@ -138,7 +138,7 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .relay-control {
+        .relay-status {
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -178,87 +178,130 @@
         .relay-info {
             font-size: 0.75em;
             opacity: 0.8;
-            margin-bottom: 8px;
         }
 
-        .relay-controls {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 6px;
-            margin-top: 8px;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 0.85em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
-        }
-
-        .btn-on { background: linear-gradient(135deg, #10b981, #059669); }
-        .btn-off { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .btn-small { padding: 5px 10px; font-size: 0.75em; }
-
-        .mode-selector {
-            display: flex;
-            gap: 4px;
-            margin-top: 6px;
-        }
-
-        .mode-btn {
-            flex: 1;
-            padding: 5px;
+        .mode-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
             font-size: 0.7em;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid var(--border);
+            font-weight: 600;
+            margin-top: 4px;
         }
 
-        .mode-btn.active {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-color: var(--primary);
+        .mode-badge.auto {
+            background: rgba(102, 126, 234, 0.2);
+            color: var(--primary);
+        }
+
+        .mode-badge.manual {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .mode-badge.forced-on {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .mode-badge.forced-off {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
         }
 
         .chart-container {
-            height: 200px;
+            height: 220px;
             margin-top: 12px;
         }
 
-        input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.1);
+        .config-display {
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
-            color: white;
-            font-size: 1em;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
         }
 
-        label {
-            display: block;
-            margin-bottom: 5px;
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
             font-size: 0.85em;
             opacity: 0.8;
         }
 
+        .config-value {
+            font-weight: 600;
+            color: var(--warning);
+        }
+
         .instructions {
             font-size: 0.9em;
-            line-height: 1.5;
+            line-height: 1.6;
             opacity: 0.9;
         }
 
         .instructions ul {
             margin: 10px 0;
             padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+
+        .telegram-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #0088cc, #0077b5);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: transform 0.2s;
+        }
+
+        .telegram-link:hover {
+            transform: translateY(-2px);
+        }
+
+        .history-item, .alert-item {
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .history-time, .alert-time {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-refresh:hover {
+            transform: translateY(-1px);
         }
 
         @media (max-width: 768px) {
@@ -268,8 +311,8 @@
 </head>
 <body>
     <div class="header">
-        <h1>🤖 ESP32 Control Automático</h1>
-        <p style="opacity: 0.7; font-size: 0.9em;">Control de clima + voz + historial en tiempo real</p>
+        <h1>🤖 ESP32 Dashboard</h1>
+        <p style="opacity: 0.7; font-size: 0.9em;">Monitoreo en Tiempo Real - Control por Telegram</p>
     </div>
 
     <div class="status-bar">
@@ -292,24 +335,36 @@
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📋</span>
-                <h2>Cómo Funciona el Sistema</h2>
+                <h2>Instrucciones de Uso</h2>
             </div>
             <div class="instructions">
-                <p><strong>Modos de los relays:</strong></p>
+                <p><strong>🔍 Este Dashboard:</strong></p>
                 <ul>
-                    <li><strong>OFF:</strong> Siempre apagado</li>
-                    <li><strong>ON:</strong> Siempre encendido</li>
-                    <li><strong>MANUAL:</strong> Control desde esta web o Telegram</li>
-                    <li><strong>AUTO:</strong> Control automático por temperatura</li>
+                    <li>📊 Visualiza temperatura y humedad en tiempo real</li>
+                    <li>📈 Muestra gráficos históricos actualizados</li>
+                    <li>⚡ Observa el estado de los dispositivos (ON/OFF)</li>
+                    <li>⚙️ Ve la configuración automática actual</li>
+                    <li>⚠️ Recibe alertas de temperatura</li>
                 </ul>
-                <p><strong>En modo AUTO:</strong></p>
+
+                <p style="margin-top: 15px;"><strong>🎮 Para Controlar:</strong></p>
                 <ul>
-                    <li><strong>Ventilador:</strong> Enciende si temperatura > setpoint + histéresis (enfría)</li>
-                    <li><strong>Calefactor:</strong> Enciende si temperatura < setpoint - histéresis (calienta)</li>
-                    <li><strong>Humidificador y Luz:</strong> Actualmente manual (puedes cambiarlo en el código ESP32)</li>
+                    <li>💬 Usa el bot de Telegram</li>
+                    <li>🎤 Envía comandos de voz</li>
+                    <li>⌨️ O escribe comandos de texto</li>
                 </ul>
-                <p><strong>Control por voz:</strong> Envía nota de voz al bot de Telegram (ej: "¿Qué temperatura hay?" o "Enciende ventilador")</p>
-                <p><strong>Respuesta triple:</strong> Texto + audio en Telegram + voz en parlante físico</p>
+
+                <p style="margin-top: 15px;"><strong>🤖 Comandos del Bot:</strong></p>
+                <ul>
+                    <li><code>/temp</code> - Ver temperatura</li>
+                    <li><code>/status</code> - Estado del sistema</li>
+                    <li>"Enciende ventilador" - Controlar relays</li>
+                    <li>"Cambia setpoint a 25" - Ajustar configuración</li>
+                </ul>
+
+                <a href="https://t.me/TU_BOT" class="telegram-link" target="_blank">
+                    📱 Abrir Bot de Telegram
+                </a>
             </div>
         </div>
 
@@ -317,27 +372,27 @@
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">🌡️</span>
-                <h2>Temperatura Actual</h2>
+                <h2>Clima Actual</h2>
             </div>
             <div class="temp-display">
                 <div class="temp-value" id="currentTemp">--°C</div>
                 <div style="opacity: 0.7; margin-top: 5px; font-size: 0.85em;">
-                    Última actualización: <span id="lastUpdate">--</span>
+                    Actualizado: <span id="lastUpdate">--</span>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center;">
                 <div>
-                    <div style="opacity: 0.7; font-size: 0.8em;">Humedad</div>
+                    <div style="opacity: 0.7; font-size: 0.8em;">💧 Humedad</div>
                     <div style="font-size: 1.3em; font-weight: bold; color: var(--info);" id="currentHum">--%</div>
                 </div>
                 <div>
-                    <div style="opacity: 0.7; font-size: 0.8em;">Setpoint</div>
+                    <div style="opacity: 0.7; font-size: 0.8em;">🎯 Setpoint</div>
                     <div style="font-size: 1.3em; font-weight: bold; color: var(--warning);" id="setpoint">--°C</div>
                 </div>
             </div>
         </div>
 
-        <!-- Gráfico -->
+        <!-- Gráfico Mejorado -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📈</span>
@@ -346,48 +401,60 @@
             <div class="chart-container">
                 <canvas id="tempChart"></canvas>
             </div>
+            <div style="text-align: center; margin-top: 10px; font-size: 0.8em; opacity: 0.7;">
+                Últimos 20 datos (actualización automática cada 3 segundos)
+            </div>
         </div>
 
-        <!-- Control de Relays -->
+        <!-- Estado de Dispositivos -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">🔌</span>
-                <h2>Dispositivos</h2>
+                <h2>Estado de Dispositivos</h2>
             </div>
-            <div id="relaysContainer"></div>
+            <div id="relaysContainer">
+                <p style="text-align: center; opacity: 0.6;">Esperando datos...</p>
+            </div>
+            <div style="margin-top: 10px; padding: 10px; background: rgba(255,158,11,0.1); border-radius: 8px; font-size: 0.85em;">
+                <strong>ℹ️ Nota:</strong> Para encender/apagar dispositivos, usa el bot de Telegram
+            </div>
         </div>
 
-        <!-- Configuración -->
+        <!-- Configuración Actual -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">⚙️</span>
-                <h2>Configuración Automática</h2>
+                <h2>Configuración Actual</h2>
             </div>
-            <div style="margin-bottom: 10px;">
-                <label>🎯 Setpoint (°C) - Temperatura objetivo</label>
-                <input type="number" id="setpointInput" value="24" min="15" max="35" step="0.5">
+            <div class="config-display">
+                <div class="config-item">
+                    <span class="config-label">🎯 Temperatura Objetivo</span>
+                    <span class="config-value" id="cfgSetpoint">24°C</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">📊 Histéresis</span>
+                    <span class="config-value" id="cfgHysteresis">2°C</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">🔥 Temp Máxima Alerta</span>
+                    <span class="config-value" id="cfgTempMax">30°C</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-label">❄️ Temp Mínima Alerta</span>
+                    <span class="config-value" id="cfgTempMin">18°C</span>
+                </div>
             </div>
-            <div style="margin-bottom: 10px;">
-                <label>📊 Histéresis (°C) - Margen de tolerancia</label>
-                <input type="number" id="hysteresisInput" value="2" min="0.5" max="5" step="0.5">
+            <div style="margin-top: 10px; padding: 10px; background: rgba(6,182,212,0.1); border-radius: 8px; font-size: 0.85em;">
+                <strong>💡 Tip:</strong> Cambia la configuración con el bot: <em>"Cambia setpoint a 25 grados"</em>
             </div>
-            <div style="margin-bottom: 10px;">
-                <label>🔥 Temp Máxima Alerta (°C)</label>
-                <input type="number" id="tempMaxInput" value="30" min="20" max="40" step="1">
-            </div>
-            <div style="margin-bottom: 10px;">
-                <label>❄️ Temp Mínima Alerta (°C)</label>
-                <input type="number" id="tempMinInput" value="18" min="10" max="25" step="1">
-            </div>
-            <button class="btn" onclick="updateConfig()">💾 Guardar Configuración</button>
         </div>
 
         <!-- Historial Supabase -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📊</span>
-                <h2>Historial (Últimas 10 lecturas)</h2>
-                <button class="btn btn-small" onclick="loadHistory()">🔄 Actualizar</button>
+                <h2>Historial Registrado</h2>
+                <button class="btn-refresh" onclick="loadHistory()">🔄</button>
             </div>
             <div id="historyContainer" style="max-height: 300px; overflow-y: auto;">
                 <p style="text-align: center; opacity: 0.6;">Cargando...</p>
@@ -399,6 +466,7 @@
             <div class="card-header">
                 <span style="font-size: 1.5em;">⚠️</span>
                 <h2>Alertas Recientes</h2>
+                <button class="btn-refresh" onclick="loadAlerts()">🔄</button>
             </div>
             <div id="alertsContainer" style="max-height: 250px; overflow-y: auto;">
                 <p style="text-align: center; opacity: 0.6;">Sin alertas</p>
@@ -423,34 +491,72 @@
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let client = null;
-        let tempChart;
-        let chartData = { labels: [], data: [] };
-        let relayStates = {};
+        let tempChart = null;
+        let chartData = { labels: [], temp: [], hum: [] };
+        let connectionAttempts = 0;
 
+        // ===== INICIALIZAR GRÁFICO =====
         function initChart() {
-            tempChart = new Chart(document.getElementById('tempChart'), {
+            const ctx = document.getElementById('tempChart');
+            if (!ctx) return;
+
+            tempChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: chartData.labels,
-                    datasets: [{
-                        label: 'Temp',
-                        data: chartData.data,
-                        borderColor: '#f59e0b',
-                        backgroundColor: '#f59e0b33',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        fill: true
-                    }]
+                    datasets: [
+                        {
+                            label: 'Temperatura (°C)',
+                            data: chartData.temp,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#f59e0b'
+                        },
+                        {
+                            label: 'Humedad (%)',
+                            data: chartData.hum,
+                            borderColor: '#06b6d4',
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#06b6d4',
+                            yAxisID: 'y1'
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#94a3b8', font: { size: 11 } }
+                        }
+                    },
                     scales: {
                         y: {
-                            beginAtZero: false,
+                            type: 'linear',
+                            position: 'left',
                             grid: { color: '#334155' },
-                            ticks: { color: '#94a3b8' }
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Temperatura (°C)', color: '#f59e0b' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Humedad (%)', color: '#06b6d4' }
                         },
                         x: {
                             grid: { color: '#334155' },
@@ -461,105 +567,66 @@
             });
         }
 
+        // ===== ACTUALIZAR ESTADO =====
         function updateStatus(elementId, isOnline, text) {
             const el = document.getElementById(elementId);
+            if (!el) return;
+            
             const pulse = el.querySelector('.pulse');
             const span = el.querySelector('span:last-child');
             
             if (isOnline) {
                 el.className = 'status-badge online';
-                pulse.className = 'pulse green';
+                if (pulse) pulse.className = 'pulse green';
             } else {
                 el.className = 'status-badge offline';
-                pulse.className = 'pulse red';
+                if (pulse) pulse.className = 'pulse red';
             }
-            if (text) span.textContent = text;
+            if (text && span) span.textContent = text;
         }
 
+        // ===== MOSTRAR RELAYS =====
         function updateRelaysUI(data) {
-            relayStates = data;
             const container = document.getElementById('relaysContainer');
+            if (!container) return;
+            
             container.innerHTML = '';
-
-            const autoInfo = [
-                "En AUTO: Se enciende si temp > setpoint + histéresis (enfriar)",
-                "En AUTO: Se enciende si temp < setpoint - histéresis (calentar)",
-                "En AUTO: Manual (configurable en código)",
-                "En AUTO: Manual (configurable en código)"
-            ];
 
             for (let i = 1; i <= 4; i++) {
                 const relay = data[`r${i}`];
                 if (!relay) continue;
 
                 const stateClass = relay.state ? 'on' : 'off';
-                const stateText = relay.state ? '🟢 ON' : '🔴 OFF';
+                const stateText = relay.state ? '🟢 ENCENDIDO' : '🔴 APAGADO';
+                const modeText = ['Forzado OFF', 'Forzado ON', 'Automático', 'Manual'][relay.mode] || 'Desconocido';
+                const modeClass = ['forced-off', 'forced-on', 'auto', 'manual'][relay.mode] || '';
                 const time = formatTime(relay.time);
-                const modeText = getModeText(relay.mode);
-                const info = relay.mode === 2 ? autoInfo[i-1] : "";
 
                 container.innerHTML += `
-                    <div class="relay-control">
+                    <div class="relay-status">
                         <div class="relay-header">
                             <span class="relay-name">${relay.name}</span>
                             <span class="relay-state ${stateClass}">${stateText}</span>
                         </div>
                         <div class="relay-info">
-                            Tiempo ON: ${time} | Modo: ${modeText}
-                            ${info ? '<br><small style="opacity:0.8;">' + info + '</small>' : ''}
+                            ⏱️ Tiempo ON: ${time}
                         </div>
-                        <div class="relay-controls">
-                            <button class="btn btn-on btn-small" onclick="controlRelay(${i}, 'ON')">ON</button>
-                            <button class="btn btn-off btn-small" onclick="controlRelay(${i}, 'OFF')">OFF</button>
-                        </div>
-                        <div class="mode-selector">
-                            <button class="btn mode-btn ${relay.mode === 0 ? 'active' : ''}" onclick="setMode(${i}, 0)">OFF</button>
-                            <button class="btn mode-btn ${relay.mode === 1 ? 'active' : ''}" onclick="setMode(${i}, 1)">ON</button>
-                            <button class="btn mode-btn ${relay.mode === 2 ? 'active' : ''}" onclick="setMode(${i}, 2)">AUTO</button>
-                            <button class="btn mode-btn ${relay.mode === 3 ? 'active' : ''}" onclick="setMode(${i}, 3)">MAN</button>
-                        </div>
+                        <span class="mode-badge ${modeClass}">
+                            ${modeText}
+                        </span>
                     </div>
                 `;
             }
-        }
-
-        function getModeText(mode) {
-            return ['OFF', 'ON', 'AUTO', 'MANUAL'][mode] || 'UNK';
         }
 
         function formatTime(seconds) {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
             const s = seconds % 60;
-            return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+            return h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
         }
 
-        function controlRelay(num, state) {
-            if (client && client.connected) {
-                client.publish(`esp32/relay/${num}/cmd`, state);
-            }
-        }
-
-        function setMode(num, mode) {
-            if (client && client.connected) {
-                client.publish(`esp32/relay/${num}/mode`, mode.toString());
-            }
-        }
-
-        function updateConfig() {
-            const config = {
-                setpoint: parseFloat(document.getElementById('setpointInput').value),
-                hysteresis: parseFloat(document.getElementById('hysteresisInput').value),
-                tempMax: parseFloat(document.getElementById('tempMaxInput').value),
-                tempMin: parseFloat(document.getElementById('tempMinInput').value)
-            };
-
-            if (client && client.connected) {
-                client.publish('esp32/config/set', JSON.stringify(config));
-                alert('✅ Configuración guardada');
-            }
-        }
-
+        // ===== CARGAR HISTORIAL =====
         async function loadHistory() {
             try {
                 const { data, error } = await supabase
@@ -572,7 +639,8 @@
 
                 const container = document.getElementById('historyContainer');
                 if (!data || data.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos</p>';
+                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos guardados</p>';
+                    updateStatus('supabaseStatus', false, 'Supabase');
                     return;
                 }
 
@@ -580,118 +648,163 @@
 
                 container.innerHTML = data.map(r => `
                     <div class="history-item">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                             <strong>🌡️ ${r.temperatura.toFixed(1)}°C</strong>
                             <span>💧 ${r.humedad.toFixed(0)}%</span>
                         </div>
                         <div class="history-time">
-                            ${new Date(r.created_at).toLocaleString('es-PE')}
+                            📅 ${new Date(r.created_at).toLocaleString('es-PE')}
                         </div>
                     </div>
                 `).join('');
 
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error Supabase:', error);
                 updateStatus('supabaseStatus', false, 'Supabase');
             }
         }
 
+        // ===== CARGAR ALERTAS =====
         async function loadAlerts() {
             try {
                 const { data } = await supabase
                     .from('system_alerts')
                     .select('*')
-                    .order('created_at', { ascending: false })
+                    .order('created_at', { ascending: false})
                     .limit(5);
 
                 const container = document.getElementById('alertsContainer');
                 if (!data || data.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">✅ Sin alertas</p>';
+                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">✅ Sistema sin alertas</p>';
                     return;
                 }
 
                 container.innerHTML = data.map(a => `
-                    <div class="alert-item">
-                        <div style="font-weight: 600; margin-bottom: 3px;">
+                    <div class="alert-item" style="border-left-color: ${a.severity === 'DANGER' ? 'var(--danger)' : 'var(--warning)'}">
+                        <div style="font-weight: 600; margin-bottom: 4px;">
                             ${a.severity === 'DANGER' ? '🚨' : '⚠️'} ${a.alert_type}
                         </div>
-                        <div style="opacity: 0.8; font-size: 0.9em;">${a.message}</div>
-                        <div class="history-time">
-                            ${new Date(a.created_at).toLocaleString('es-PE')}
+                        <div style="opacity: 0.9; font-size: 0.9em;">${a.message}</div>
+                        <div class="alert-time">
+                            📅 ${new Date(a.created_at).toLocaleString('es-PE')}
                         </div>
                     </div>
                 `).join('');
 
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error alertas:', error);
             }
         }
 
+        // ===== CONECTAR MQTT =====
         function connectMQTT() {
+            connectionAttempts++;
+            console.log(`Conectando MQTT (intento ${connectionAttempts})...`);
+            
             const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
             
-            client = mqtt.connect(url, {
-                username: MQTT_CONFIG.user,
-                password: MQTT_CONFIG.pass,
-                clientId: 'Web_' + Math.random().toString(16).substr(2, 8),
-                reconnectPeriod: 5000
-            });
+            try {
+                client = mqtt.connect(url, {
+                    username: MQTT_CONFIG.user,
+                    password: MQTT_CONFIG.pass,
+                    clientId: 'Dashboard_' + Math.random().toString(16).substr(2, 8),
+                    reconnectPeriod: 5000,
+                    connectTimeout: 10000
+                });
 
-            client.on('connect', () => {
-                console.log('✅ MQTT conectado');
-                updateStatus('mqttStatus', true, 'MQTT');
-                
-                client.subscribe('esp32/sensores');
-                client.subscribe('esp32/status');
-                client.subscribe('esp32/relay/status');
-                client.subscribe('esp32/config');
-            });
+                client.on('connect', () => {
+                    console.log('✅ MQTT conectado');
+                    connectionAttempts = 0;
+                    updateStatus('mqttStatus', true, 'MQTT');
+                    
+                    client.subscribe([
+                        'esp32/sensores',
+                        'esp32/status',
+                        'esp32/relay/status',
+                        'esp32/config'
+                    ]);
+                });
 
-            client.on('message', (topic, message) => {
-                const msg = message.toString();
-                
-                if (topic === 'esp32/status') {
-                    updateStatus('esp32Status', msg === 'online', 'ESP32');
-                } 
-                else if (topic === 'esp32/sensores') {
-                    const data = JSON.parse(msg);
-                    document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
-                    document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
-                    document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
-                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
+                client.on('message', (topic, message) => {
+                    const msg = message.toString();
+                    
+                    try {
+                        if (topic === 'esp32/status') {
+                            updateStatus('esp32Status', msg === 'online', 'ESP32');
+                        } 
+                        else if (topic === 'esp32/sensores') {
+                            const data = JSON.parse(msg);
+                            updateStatus('esp32Status', true, 'ESP32');
+                            
+                            // Actualizar valores
+                            document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
+                            document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
+                            document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
+                            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
 
-                    const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-                    chartData.labels.push(time);
-                    chartData.data.push(data.temp);
-                    if (chartData.labels.length > 20) {
-                        chartData.labels.shift();
-                        chartData.data.shift();
+                            // Actualizar gráfico
+                            const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            chartData.labels.push(time);
+                            chartData.temp.push(data.temp);
+                            chartData.hum.push(data.hum);
+                            
+                            // Mantener solo últimos 20 datos
+                            if (chartData.labels.length > 20) {
+                                chartData.labels.shift();
+                                chartData.temp.shift();
+                                chartData.hum.shift();
+                            }
+                            
+                            if (tempChart) {
+                                tempChart.update('none'); // Actualización sin animación para mejor rendimiento
+                            }
+                        }
+                        else if (topic === 'esp32/relay/status') {
+                            updateRelaysUI(JSON.parse(msg));
+                        }
+                        else if (topic === 'esp32/config') {
+                            const cfg = JSON.parse(msg);
+                            document.getElementById('cfgSetpoint').textContent = cfg.setpoint.toFixed(1) + '°C';
+                            document.getElementById('cfgHysteresis').textContent = cfg.hysteresis.toFixed(1) + '°C';
+                            if (cfg.tempMax) document.getElementById('cfgTempMax').textContent = cfg.tempMax + '°C';
+                            if (cfg.tempMin) document.getElementById('cfgTempMin').textContent = cfg.tempMin + '°C';
+                        }
+                    } catch (e) {
+                        console.error('Error procesando mensaje:', e);
                     }
-                    tempChart.update();
-                }
-                else if (topic === 'esp32/relay/status') {
-                    updateRelaysUI(JSON.parse(msg));
-                }
-                else if (topic === 'esp32/config') {
-                    const data = JSON.parse(msg);
-                    document.getElementById('setpointInput').value = data.setpoint;
-                    document.getElementById('hysteresisInput').value = data.hysteresis;
-                }
-            });
+                });
 
-            client.on('offline', () => {
-                updateStatus('mqttStatus', false, 'MQTT');
-            });
+                client.on('error', (err) => {
+                    console.error('Error MQTT:', err);
+                    updateStatus('mqttStatus', false, 'MQTT: Error');
+                });
+
+                client.on('offline', () => {
+                    updateStatus('mqttStatus', false, 'MQTT: Desconectado');
+                    updateStatus('esp32Status', false, 'ESP32');
+                });
+
+            } catch (error) {
+                console.error('Error iniciando MQTT:', error);
+                updateStatus('mqttStatus', false, 'MQTT: Error fatal');
+            }
         }
 
+        // ===== INICIALIZACIÓN =====
         window.addEventListener('load', () => {
+            console.log('🚀 Iniciando Dashboard ESP32...');
+            
+            // Inicializar componentes
             initChart();
             connectMQTT();
             loadHistory();
             loadAlerts();
             
-            setInterval(loadHistory, 60000);
-            setInterval(loadAlerts, 30000);
+            // Actualización periódica
+            setInterval(loadHistory, 60000);  // Cada 1 minuto
+            setInterval(loadAlerts, 30000);   // Cada 30 segundos
+            
+            console.log('✅ Dashboard listo');
         });
     </script>
 </body>
