@@ -304,6 +304,20 @@
             transform: translateY(-1px);
         }
 
+        .readonly-notice {
+            background: rgba(102, 126, 234, 0.15);
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .readonly-notice h3 {
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
         @media (max-width: 768px) {
             .dashboard { grid-template-columns: 1fr; }
         }
@@ -315,18 +329,20 @@
         <p style="opacity: 0.7; font-size: 0.9em;">Monitoreo en Tiempo Real - Control por Telegram</p>
     </div>
 
+    <div class="readonly-notice">
+        <h3>📖 Modo Solo Lectura</h3>
+        <p style="font-size: 0.9em;">Este dashboard muestra datos en tiempo real desde Supabase.<br>
+        Para controlar dispositivos, usa el <strong>Bot de Telegram</strong> 👇</p>
+    </div>
+
     <div class="status-bar">
-        <div id="mqttStatus" class="status-badge offline">
+        <div id="supabaseStatus" class="status-badge offline">
             <span class="pulse red"></span>
-            <span>MQTT</span>
+            <span>Base de Datos</span>
         </div>
         <div id="esp32Status" class="status-badge offline">
             <span class="pulse red"></span>
             <span>ESP32</span>
-        </div>
-        <div id="supabaseStatus" class="status-badge offline">
-            <span class="pulse red"></span>
-            <span>Supabase</span>
         </div>
     </div>
 
@@ -360,6 +376,8 @@
                     <li><code>/status</code> - Estado del sistema</li>
                     <li>"Enciende ventilador" - Controlar relays</li>
                     <li>"Cambia setpoint a 25" - Ajustar configuración</li>
+                    <li>"Cambia temperatura máxima a 30"</li>
+                    <li>"Cambia temperatura mínima a 18"</li>
                 </ul>
 
                 <a href="https://t.me/TU_BOT" class="telegram-link" target="_blank">
@@ -377,7 +395,7 @@
             <div class="temp-display">
                 <div class="temp-value" id="currentTemp">--°C</div>
                 <div style="opacity: 0.7; margin-top: 5px; font-size: 0.85em;">
-                    Actualizado: <span id="lastUpdate">--</span>
+                    Actualizado: <span id="lastUpdate">Cargando...</span>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center;">
@@ -392,7 +410,7 @@
             </div>
         </div>
 
-        <!-- Gráfico Mejorado -->
+        <!-- Gráfico -->
         <div class="card">
             <div class="card-header">
                 <span style="font-size: 1.5em;">📈</span>
@@ -402,7 +420,7 @@
                 <canvas id="tempChart"></canvas>
             </div>
             <div style="text-align: center; margin-top: 10px; font-size: 0.8em; opacity: 0.7;">
-                Últimos 20 datos (actualización automática cada 3 segundos)
+                Últimos 20 datos (actualización automática cada 5 segundos)
             </div>
         </div>
 
@@ -429,23 +447,23 @@
             <div class="config-display">
                 <div class="config-item">
                     <span class="config-label">🎯 Temperatura Objetivo</span>
-                    <span class="config-value" id="cfgSetpoint">24°C</span>
+                    <span class="config-value" id="cfgSetpoint">--°C</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">📊 Histéresis</span>
-                    <span class="config-value" id="cfgHysteresis">2°C</span>
+                    <span class="config-value" id="cfgHysteresis">--°C</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">🔥 Temp Máxima Alerta</span>
-                    <span class="config-value" id="cfgTempMax">30°C</span>
+                    <span class="config-value" id="cfgTempMax">--°C</span>
                 </div>
                 <div class="config-item">
                     <span class="config-label">❄️ Temp Mínima Alerta</span>
-                    <span class="config-value" id="cfgTempMin">18°C</span>
+                    <span class="config-value" id="cfgTempMin">--°C</span>
                 </div>
             </div>
             <div style="margin-top: 10px; padding: 10px; background: rgba(6,182,212,0.1); border-radius: 8px; font-size: 0.85em;">
-                <strong>💡 Tip:</strong> Cambia la configuración con el bot: <em>"Cambia setpoint a 25 grados"</em>
+                <strong>💡 Tip:</strong> Cambia la configuración con el bot: <em>"Cambia temperatura máxima a 30 grados"</em>
             </div>
         </div>
 
@@ -474,26 +492,17 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const MQTT_CONFIG = {
-            host: 'e311193c90544b20aa5e2fc9b1c06df5.s1.eu.hivemq.cloud',
-            port: 8884,
-            user: 'esp32user',
-            pass: 'Esp32pass123'
-        };
-
+        // ⚠️ CONFIGURACIÓN - Reemplaza con tus credenciales reales
         const SUPABASE_URL = 'https://yxwinzfhokugvtpmvyqz.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d2luemZob2t1Z3Z0cG12eXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MzIyNjcsImV4cCI6MjA4MTQwODI2N30.xbNWsxmQ4MwbjaQgzfZLkvLE66XqaANiUD4pggr43Vg';
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let client = null;
         let tempChart = null;
         let chartData = { labels: [], temp: [], hum: [] };
-        let connectionAttempts = 0;
 
         // ===== INICIALIZAR GRÁFICO =====
         function initChart() {
@@ -585,45 +594,156 @@
             if (text && span) span.textContent = text;
         }
 
-        // ===== MOSTRAR RELAYS =====
-        function updateRelaysUI(data) {
-            const container = document.getElementById('relaysContainer');
-            if (!container) return;
-            
-            container.innerHTML = '';
+        // ===== CARGAR DATOS MÁS RECIENTES =====
+        async function loadLatestData() {
+            try {
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
 
-            for (let i = 1; i <= 4; i++) {
-                const relay = data[`r${i}`];
-                if (!relay) continue;
+                if (error) throw error;
 
-                const stateClass = relay.state ? 'on' : 'off';
-                const stateText = relay.state ? '🟢 ENCENDIDO' : '🔴 APAGADO';
-                const modeText = ['Forzado OFF', 'Forzado ON', 'Automático', 'Manual'][relay.mode] || 'Desconocido';
-                const modeClass = ['forced-off', 'forced-on', 'auto', 'manual'][relay.mode] || '';
-                const time = formatTime(relay.time);
+                if (data && data.length > 0) {
+                    const latest = data[0];
+                    
+                    updateStatus('supabaseStatus', true, 'Base de Datos');
+                    
+                    // Verificar si el ESP32 está activo (dato reciente = últimos 30 segundos)
+                    const lastUpdate = new Date(latest.created_at);
+                    const now = new Date();
+                    const diffSeconds = (now - lastUpdate) / 1000;
+                    
+                    if (diffSeconds < 30) {
+                        updateStatus('esp32Status', true, 'ESP32');
+                    } else {
+                        updateStatus('esp32Status', false, 'ESP32 (offline)');
+                    }
+                    
+                    // Actualizar temperatura y humedad
+                    document.getElementById('currentTemp').textContent = latest.temperatura.toFixed(1) + '°C';
+                    document.getElementById('currentHum').textContent = latest.humedad.toFixed(0) + '%';
+                    document.getElementById('lastUpdate').textContent = lastUpdate.toLocaleTimeString('es-PE');
+                    
+                    // Si hay setpoint en los datos
+                    if (latest.setpoint) {
+                        document.getElementById('setpoint').textContent = latest.setpoint.toFixed(1) + '°C';
+                    }
+                }
 
-                container.innerHTML += `
-                    <div class="relay-status">
-                        <div class="relay-header">
-                            <span class="relay-name">${relay.name}</span>
-                            <span class="relay-state ${stateClass}">${stateText}</span>
-                        </div>
-                        <div class="relay-info">
-                            ⏱️ Tiempo ON: ${time}
-                        </div>
-                        <span class="mode-badge ${modeClass}">
-                            ${modeText}
-                        </span>
-                    </div>
-                `;
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                updateStatus('supabaseStatus', false, 'Base de Datos');
+                updateStatus('esp32Status', false, 'ESP32');
             }
         }
 
-        function formatTime(seconds) {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = seconds % 60;
-            return h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+        // ===== CARGAR HISTORIAL PARA GRÁFICO =====
+        async function loadChartData() {
+            try {
+                const { data, error } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    // Invertir para mostrar del más antiguo al más reciente
+                    data.reverse();
+                    
+                    chartData.labels = [];
+                    chartData.temp = [];
+                    chartData.hum = [];
+                    
+                    data.forEach(r => {
+                        const time = new Date(r.created_at).toLocaleTimeString('es-PE', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                        chartData.labels.push(time);
+                        chartData.temp.push(r.temperatura);
+                        chartData.hum.push(r.humedad);
+                    });
+                    
+                    if (tempChart) {
+                        tempChart.update('none');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error cargando gráfico:', error);
+            }
+        }
+
+        // ===== CARGAR CONFIGURACIÓN =====
+        async function loadConfig() {
+            try {
+                const { data, error } = await supabase
+                    .from('system_config')
+                    .select('*')
+                    .limit(1)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    document.getElementById('cfgSetpoint').textContent = data.setpoint.toFixed(1) + '°C';
+                    document.getElementById('cfgHysteresis').textContent = data.hysteresis.toFixed(1) + '°C';
+                    document.getElementById('cfgTempMax').textContent = data.temp_max + '°C';
+                    document.getElementById('cfgTempMin').textContent = data.temp_min + '°C';
+                    
+                    document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
+                }
+
+            } catch (error) {
+                console.error('Error cargando configuración:', error);
+            }
+        }
+
+        // ===== CARGAR ESTADO DE RELAYS =====
+        async function loadRelays() {
+            try {
+                const { data, error } = await supabase
+                    .from('relay_states')
+                    .select('*')
+                    .order('relay_number', { ascending: true });
+
+                if (error) throw error;
+
+                const container = document.getElementById('relaysContainer');
+                
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos de dispositivos</p>';
+                    return;
+                }
+
+                const modes = ['🔴 Forzado OFF', '🟢 Forzado ON', '🤖 Automático', '✋ Manual'];
+                
+                container.innerHTML = data.map(r => {
+                    const stateClass = r.state ? 'on' : 'off';
+                    const stateText = r.state ? '🟢 ENCENDIDO' : '🔴 APAGADO';
+                    const modeText = modes[r.mode] || 'Desconocido';
+                    const modeClass = ['forced-off', 'forced-on', 'auto', 'manual'][r.mode] || '';
+                    
+                    return `
+                        <div class="relay-status">
+                            <div class="relay-header">
+                                <span class="relay-name">${r.name}</span>
+                                <span class="relay-state ${stateClass}">${stateText}</span>
+                            </div>
+                            <span class="mode-badge ${modeClass}">
+                                ${modeText}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error cargando relays:', error);
+            }
         }
 
         // ===== CARGAR HISTORIAL =====
@@ -640,11 +760,8 @@
                 const container = document.getElementById('historyContainer');
                 if (!data || data.length === 0) {
                     container.innerHTML = '<p style="text-align: center; opacity: 0.6;">Sin datos guardados</p>';
-                    updateStatus('supabaseStatus', false, 'Supabase');
                     return;
                 }
-
-                updateStatus('supabaseStatus', true, 'Supabase');
 
                 container.innerHTML = data.map(r => `
                     <div class="history-item">
@@ -660,7 +777,6 @@
 
             } catch (error) {
                 console.error('Error Supabase:', error);
-                updateStatus('supabaseStatus', false, 'Supabase');
             }
         }
 
@@ -696,113 +812,28 @@
             }
         }
 
-        // ===== CONECTAR MQTT =====
-        function connectMQTT() {
-            connectionAttempts++;
-            console.log(`Conectando MQTT (intento ${connectionAttempts})...`);
-            
-            const url = `wss://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}/mqtt`;
-            
-            try {
-                client = mqtt.connect(url, {
-                    username: MQTT_CONFIG.user,
-                    password: MQTT_CONFIG.pass,
-                    clientId: 'Dashboard_' + Math.random().toString(16).substr(2, 8),
-                    reconnectPeriod: 5000,
-                    connectTimeout: 10000
-                });
-
-                client.on('connect', () => {
-                    console.log('✅ MQTT conectado');
-                    connectionAttempts = 0;
-                    updateStatus('mqttStatus', true, 'MQTT');
-                    
-                    client.subscribe([
-                        'esp32/sensores',
-                        'esp32/status',
-                        'esp32/relay/status',
-                        'esp32/config'
-                    ]);
-                });
-
-                client.on('message', (topic, message) => {
-                    const msg = message.toString();
-                    
-                    try {
-                        if (topic === 'esp32/status') {
-                            updateStatus('esp32Status', msg === 'online', 'ESP32');
-                        } 
-                        else if (topic === 'esp32/sensores') {
-                            const data = JSON.parse(msg);
-                            updateStatus('esp32Status', true, 'ESP32');
-                            
-                            // Actualizar valores
-                            document.getElementById('currentTemp').textContent = data.temp.toFixed(1) + '°C';
-                            document.getElementById('currentHum').textContent = data.hum.toFixed(0) + '%';
-                            document.getElementById('setpoint').textContent = data.setpoint.toFixed(1) + '°C';
-                            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-PE');
-
-                            // Actualizar gráfico
-                            const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                            chartData.labels.push(time);
-                            chartData.temp.push(data.temp);
-                            chartData.hum.push(data.hum);
-                            
-                            // Mantener solo últimos 20 datos
-                            if (chartData.labels.length > 20) {
-                                chartData.labels.shift();
-                                chartData.temp.shift();
-                                chartData.hum.shift();
-                            }
-                            
-                            if (tempChart) {
-                                tempChart.update('none'); // Actualización sin animación para mejor rendimiento
-                            }
-                        }
-                        else if (topic === 'esp32/relay/status') {
-                            updateRelaysUI(JSON.parse(msg));
-                        }
-                        else if (topic === 'esp32/config') {
-                            const cfg = JSON.parse(msg);
-                            document.getElementById('cfgSetpoint').textContent = cfg.setpoint.toFixed(1) + '°C';
-                            document.getElementById('cfgHysteresis').textContent = cfg.hysteresis.toFixed(1) + '°C';
-                            if (cfg.tempMax) document.getElementById('cfgTempMax').textContent = cfg.tempMax + '°C';
-                            if (cfg.tempMin) document.getElementById('cfgTempMin').textContent = cfg.tempMin + '°C';
-                        }
-                    } catch (e) {
-                        console.error('Error procesando mensaje:', e);
-                    }
-                });
-
-                client.on('error', (err) => {
-                    console.error('Error MQTT:', err);
-                    updateStatus('mqttStatus', false, 'MQTT: Error');
-                });
-
-                client.on('offline', () => {
-                    updateStatus('mqttStatus', false, 'MQTT: Desconectado');
-                    updateStatus('esp32Status', false, 'ESP32');
-                });
-
-            } catch (error) {
-                console.error('Error iniciando MQTT:', error);
-                updateStatus('mqttStatus', false, 'MQTT: Error fatal');
-            }
-        }
-
         // ===== INICIALIZACIÓN =====
         window.addEventListener('load', () => {
-            console.log('🚀 Iniciando Dashboard ESP32...');
+            console.log('🚀 Iniciando Dashboard ESP32 (Solo Lectura)...');
             
             // Inicializar componentes
             initChart();
-            connectMQTT();
+            
+            // Cargar datos iniciales
+            loadLatestData();
+            loadChartData();
+            loadConfig();
+            loadRelays();
             loadHistory();
             loadAlerts();
             
             // Actualización periódica
-            setInterval(loadHistory, 60000);  // Cada 1 minuto
-            setInterval(loadAlerts, 30000);   // Cada 30 segundos
+            setInterval(loadLatestData, 5000);     // Cada 5 segundos
+            setInterval(loadChartData, 10000);     // Cada 10 segundos
+            setInterval(loadRelays, 10000);        // Cada 10 segundos
+            setInterval(loadHistory, 30000);       // Cada 30 segundos
+            setInterval(loadAlerts, 20000);        // Cada 20 segundos
+            setInterval(loadConfig, 15000);        // Cada 15 segundos
             
             console.log('✅ Dashboard listo');
         });
